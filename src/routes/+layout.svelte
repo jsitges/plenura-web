@@ -3,6 +3,8 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { initAnalytics, trackPageView } from '$lib/analytics';
+	import SEO from '$lib/components/SEO.svelte';
+	import CookieConsent from '$lib/components/CookieConsent.svelte';
 
 	let { children } = $props();
 
@@ -17,8 +19,8 @@
 	});
 </script>
 
-<svelte:head>
-	<title>Plenura - Bienestar a tu alcance</title>
-</svelte:head>
+<SEO />
 
 {@render children()}
+
+<CookieConsent />

@@ -21,6 +21,8 @@ export interface Database {
 					avatar_url: string | null;
 					role: 'client' | 'therapist' | 'admin';
 					locale: string;
+					email_preferences: Json | null;
+					referred_by_code: string | null;
 					created_at: string;
 					updated_at: string;
 				};
@@ -32,6 +34,8 @@ export interface Database {
 					avatar_url?: string | null;
 					role?: 'client' | 'therapist' | 'admin';
 					locale?: string;
+					email_preferences?: Json | null;
+					referred_by_code?: string | null;
 					created_at?: string;
 					updated_at?: string;
 				};
@@ -43,6 +47,8 @@ export interface Database {
 					avatar_url?: string | null;
 					role?: 'client' | 'therapist' | 'admin';
 					locale?: string;
+					email_preferences?: Json | null;
+					referred_by_code?: string | null;
 					created_at?: string;
 					updated_at?: string;
 				};
@@ -63,6 +69,9 @@ export interface Database {
 					timezone: string;
 					colectiva_wallet_id: string | null;
 					subscription_tier: 'free' | 'pro' | 'business' | 'enterprise';
+					is_featured: boolean;
+					featured_until: string | null;
+					monthly_booking_count: number;
 					created_at: string;
 					updated_at: string;
 				};
@@ -81,6 +90,9 @@ export interface Database {
 					timezone?: string;
 					colectiva_wallet_id?: string | null;
 					subscription_tier?: 'free' | 'pro' | 'business' | 'enterprise';
+					is_featured?: boolean;
+					featured_until?: string | null;
+					monthly_booking_count?: number;
 					created_at?: string;
 					updated_at?: string;
 				};
@@ -99,6 +111,9 @@ export interface Database {
 					timezone?: string;
 					colectiva_wallet_id?: string | null;
 					subscription_tier?: 'free' | 'pro' | 'business' | 'enterprise';
+					is_featured?: boolean;
+					featured_until?: string | null;
+					monthly_booking_count?: number;
 					created_at?: string;
 					updated_at?: string;
 				};
@@ -222,6 +237,11 @@ export interface Database {
 					notes: string | null;
 					source: string;
 					escrow_id: string | null;
+					reminder_24h_sent_at: string | null;
+					reminder_1h_sent_at: string | null;
+					completed_at: string | null;
+					completed_by: string | null;
+					cancelled_at: string | null;
 					created_at: string;
 					updated_at: string;
 				};
@@ -244,6 +264,11 @@ export interface Database {
 					notes?: string | null;
 					source?: string;
 					escrow_id?: string | null;
+					reminder_24h_sent_at?: string | null;
+					reminder_1h_sent_at?: string | null;
+					completed_at?: string | null;
+					completed_by?: string | null;
+					cancelled_at?: string | null;
 					created_at?: string;
 					updated_at?: string;
 				};
@@ -266,6 +291,11 @@ export interface Database {
 					notes?: string | null;
 					source?: string;
 					escrow_id?: string | null;
+					reminder_24h_sent_at?: string | null;
+					reminder_1h_sent_at?: string | null;
+					completed_at?: string | null;
+					completed_by?: string | null;
+					cancelled_at?: string | null;
 					created_at?: string;
 					updated_at?: string;
 				};
@@ -278,6 +308,7 @@ export interface Database {
 					therapist_id: string;
 					rating: number;
 					comment: string | null;
+					therapist_response: string | null;
 					is_public: boolean;
 					created_at: string;
 				};
@@ -288,6 +319,7 @@ export interface Database {
 					therapist_id: string;
 					rating: number;
 					comment?: string | null;
+					therapist_response?: string | null;
 					is_public?: boolean;
 					created_at?: string;
 				};
@@ -298,7 +330,40 @@ export interface Database {
 					therapist_id?: string;
 					rating?: number;
 					comment?: string | null;
+					therapist_response?: string | null;
 					is_public?: boolean;
+					created_at?: string;
+				};
+			};
+			tips: {
+				Row: {
+					id: string;
+					booking_id: string;
+					client_id: string;
+					therapist_id: string;
+					amount_cents: number;
+					plenura_fee_cents: number;
+					therapist_amount_cents: number;
+					created_at: string;
+				};
+				Insert: {
+					id?: string;
+					booking_id: string;
+					client_id: string;
+					therapist_id: string;
+					amount_cents: number;
+					plenura_fee_cents?: number;
+					therapist_amount_cents: number;
+					created_at?: string;
+				};
+				Update: {
+					id?: string;
+					booking_id?: string;
+					client_id?: string;
+					therapist_id?: string;
+					amount_cents?: number;
+					plenura_fee_cents?: number;
+					therapist_amount_cents?: number;
 					created_at?: string;
 				};
 			};
@@ -463,3 +528,4 @@ export type Booking = Tables<'bookings'>;
 export type Review = Tables<'reviews'>;
 export type Availability = Tables<'availability'>;
 export type ReferralCode = Tables<'referral_codes'>;
+export type Tip = Tables<'tips'>;

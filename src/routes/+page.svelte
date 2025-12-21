@@ -53,36 +53,48 @@
 
 <div class="min-h-screen bg-base-100">
 	<!-- Navigation -->
-	<nav class="navbar bg-base-100 shadow-sm sticky top-0 z-50">
+	<nav class="navbar bg-base-100/95 backdrop-blur-sm shadow-sm sticky top-0 z-50">
 		<div class="container-app flex justify-between items-center py-2">
-			<a href="/" class="text-2xl font-bold text-primary">Plenura</a>
-			<div class="flex gap-4 items-center">
+			<a href="/" class="text-xl md:text-2xl font-bold text-primary">Plenura</a>
+
+			<!-- Desktop Navigation -->
+			<div class="hidden md:flex gap-4 items-center">
 				<a href="/therapists" class="btn btn-ghost">Buscar Terapeutas</a>
-				<a href="/login" class="btn btn-outline btn-primary">Iniciar Sesión</a>
+				<a href="/login" class="btn btn-outline btn-primary">Iniciar Sesion</a>
 				<a href="/register" class="btn btn-primary">Registrarse</a>
+			</div>
+
+			<!-- Mobile Navigation -->
+			<div class="flex md:hidden gap-2 items-center">
+				<a href="/therapists" class="btn btn-ghost btn-sm px-2" aria-label="Buscar terapeutas">
+					<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+					</svg>
+				</a>
+				<a href="/login" class="btn btn-outline btn-primary btn-sm">Entrar</a>
 			</div>
 		</div>
 	</nav>
 
 	<!-- Hero Section -->
-	<section class="relative bg-gradient-to-br from-primary-50 via-white to-secondary-50 section-padding">
+	<section class="relative bg-gradient-to-br from-primary-50 via-white to-secondary-50 section-padding overflow-hidden">
 		<div class="container-app">
-			<div class="max-w-3xl mx-auto text-center">
-				<h1 class="text-4xl md:text-6xl font-bold text-gray-900 mb-6 animate-fade-in">
+			<div class="max-w-3xl mx-auto text-center px-4">
+				<h1 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-4 md:mb-6 animate-fade-in">
 					Tu bienestar, a un clic de distancia
 				</h1>
-				<p class="text-xl text-gray-600 mb-8 animate-slide-up">
-					Conectamos a los mejores terapeutas de México contigo. Masajes, fisioterapia, psicología y más, en la comodidad de tu hogar.
+				<p class="text-base sm:text-lg md:text-xl text-gray-600 mb-6 md:mb-8 animate-slide-up">
+					Conectamos a los mejores terapeutas de Mexico contigo. Masajes, fisioterapia, psicologia y mas, en la comodidad de tu hogar.
 				</p>
 
 				<!-- Search Box -->
-				<div class="card bg-white shadow-xl p-6 max-w-2xl mx-auto animate-slide-up">
-					<form onsubmit={(e) => { e.preventDefault(); handleSearch(); }} class="flex flex-col md:flex-row gap-4">
+				<div class="card bg-white shadow-xl p-4 md:p-6 max-w-2xl mx-auto animate-slide-up">
+					<form onsubmit={(e) => { e.preventDefault(); handleSearch(); }} class="flex flex-col gap-3 md:flex-row md:gap-4">
 						<div class="flex-1">
 							<input
 								type="text"
 								bind:value={searchQuery}
-								placeholder="¿Qué servicio buscas?"
+								placeholder="Que servicio buscas?"
 								class="input-wellness"
 							/>
 						</div>
@@ -90,11 +102,11 @@
 							<input
 								type="text"
 								bind:value={location}
-								placeholder="Tu ubicación"
+								placeholder="Tu ubicacion"
 								class="input-wellness"
 							/>
 						</div>
-						<button type="submit" class="btn btn-primary">
+						<button type="submit" class="btn btn-primary w-full md:w-auto">
 							<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
 							</svg>
@@ -105,18 +117,18 @@
 			</div>
 		</div>
 
-		<!-- Decorative shapes -->
-		<div class="absolute top-20 left-10 w-64 h-64 bg-primary-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse"></div>
-		<div class="absolute bottom-20 right-10 w-64 h-64 bg-secondary-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse"></div>
+		<!-- Decorative shapes (hidden on small screens for performance) -->
+		<div class="hidden sm:block absolute top-20 left-10 w-48 md:w-64 h-48 md:h-64 bg-primary-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse"></div>
+		<div class="hidden sm:block absolute bottom-20 right-10 w-48 md:w-64 h-48 md:h-64 bg-secondary-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse"></div>
 	</section>
 
 	<!-- Categories Section -->
 	<section class="section-padding bg-white">
-		<div class="container-app">
-			<h2 class="text-3xl font-bold text-center text-gray-900 mb-12">
-				Explora por categoría
+		<div class="container-app px-4">
+			<h2 class="text-2xl md:text-3xl font-bold text-center text-gray-900 mb-8 md:mb-12">
+				Explora por categoria
 			</h2>
-			<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+			<div class="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-6 gap-3 md:gap-6">
 				{#each categories as category}
 					<a href={`/therapists?category=${category.slug}`} class="card-wellness text-center group cursor-pointer">
 						<div class="text-4xl mb-4 group-hover:scale-110 transition-transform">{category.icon}</div>
@@ -129,12 +141,12 @@
 
 	<!-- Featured Therapists -->
 	<section class="section-padding bg-base-200">
-		<div class="container-app">
-			<div class="flex justify-between items-center mb-12">
-				<h2 class="text-3xl font-bold text-gray-900">Terapeutas destacados</h2>
-				<a href="/therapists" class="btn btn-ghost btn-primary">Ver todos →</a>
+		<div class="container-app px-4">
+			<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 md:mb-12">
+				<h2 class="text-2xl md:text-3xl font-bold text-gray-900">Terapeutas destacados</h2>
+				<a href="/therapists" class="btn btn-ghost btn-primary btn-sm sm:btn-md">Ver todos</a>
 			</div>
-			<div class="grid md:grid-cols-3 gap-8">
+			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
 				{#each featuredTherapists as therapist}
 					<a href={`/therapists/${therapist.id}`} class="card bg-white shadow-lg hover:shadow-xl transition-shadow">
 						<figure class="px-4 pt-4">
@@ -215,36 +227,37 @@
 	</section>
 
 	<!-- Footer -->
-	<footer class="footer p-10 bg-neutral text-neutral-content">
-		<div class="container-app grid grid-cols-2 md:grid-cols-4 gap-8">
+	<footer class="footer p-6 md:p-10 bg-neutral text-neutral-content">
+		<div class="container-app grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 px-4">
 			<nav>
-				<h6 class="footer-title">Servicios</h6>
-				<a href="/therapists?category=massage" class="link link-hover">Masajes</a>
-				<a href="/therapists?category=physiotherapy" class="link link-hover">Fisioterapia</a>
-				<a href="/therapists?category=psychology" class="link link-hover">Psicología</a>
-				<a href="/therapists?category=nutrition" class="link link-hover">Nutrición</a>
+				<h6 class="footer-title text-sm md:text-base">Servicios</h6>
+				<a href="/therapists?category=massage" class="link link-hover text-sm">Masajes</a>
+				<a href="/therapists?category=physiotherapy" class="link link-hover text-sm">Fisioterapia</a>
+				<a href="/therapists?category=psychology" class="link link-hover text-sm">Psicologia</a>
+				<a href="/therapists?category=nutrition" class="link link-hover text-sm">Nutricion</a>
 			</nav>
 			<nav>
-				<h6 class="footer-title">Empresa</h6>
-				<a href="/about" class="link link-hover">Sobre nosotros</a>
-				<a href="/become-therapist" class="link link-hover">Ser terapeuta</a>
-				<a href="/contact" class="link link-hover">Contacto</a>
+				<h6 class="footer-title text-sm md:text-base">Empresa</h6>
+				<a href="/about" class="link link-hover text-sm">Sobre nosotros</a>
+				<a href="/become-therapist" class="link link-hover text-sm">Ser terapeuta</a>
+				<a href="/contact" class="link link-hover text-sm">Contacto</a>
 			</nav>
 			<nav>
-				<h6 class="footer-title">Legal</h6>
-				<a href="/terms" class="link link-hover">Términos de uso</a>
-				<a href="/privacy" class="link link-hover">Privacidad</a>
+				<h6 class="footer-title text-sm md:text-base">Legal</h6>
+				<a href="/terms" class="link link-hover text-sm">Términos de uso</a>
+				<a href="/privacy" class="link link-hover text-sm">Privacidad</a>
+				<a href="/support" class="link link-hover text-sm">Soporte</a>
 			</nav>
 			<nav aria-label="Redes sociales">
-				<h6 class="footer-title">Redes sociales</h6>
+				<h6 class="footer-title text-sm md:text-base">Redes sociales</h6>
 				<div class="grid grid-flow-col gap-4">
 					<a href="https://twitter.com/plenura" aria-label="Twitter" class="hover:text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z"/></svg></a>
 					<a href="https://instagram.com/plenura" aria-label="Instagram" class="hover:text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg></a>
 				</div>
 			</nav>
 		</div>
-		<div class="container-app border-t border-gray-700 mt-8 pt-8">
-			<p class="text-center text-gray-400">© 2024 Plenura. Todos los derechos reservados. Un producto de Red Broom Software S.A.S.</p>
+		<div class="container-app border-t border-gray-700 mt-6 md:mt-8 pt-6 md:pt-8 px-4">
+			<p class="text-center text-gray-400 text-xs md:text-sm">{new Date().getFullYear()} Plenura. Todos los derechos reservados. Un producto de Red Broom Software S.A.S.</p>
 		</div>
 	</footer>
 </div>

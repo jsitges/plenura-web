@@ -11,8 +11,34 @@ import {
 	sendBookingConfirmationToClient,
 	sendNewBookingToTherapist,
 	sendBookingCancellation,
+	sendReviewRequest,
 	type BookingEmailData
 } from './email.service';
+import {
+	sendBookingConfirmationWhatsApp,
+	sendNewBookingToTherapistWhatsApp,
+	sendBookingCancellationWhatsApp,
+	sendReviewRequestWhatsApp
+} from './whatsapp.service';
+
+// Subscription tiers that have WhatsApp enabled
+const WHATSAPP_ENABLED_TIERS = ['business', 'enterprise'];
+
+interface EmailPreferences {
+	booking_reminders: boolean;
+	review_requests: boolean;
+	tips_received: boolean;
+	marketing: boolean;
+	weekly_reports: boolean;
+}
+
+const DEFAULT_PREFERENCES: EmailPreferences = {
+	booking_reminders: true,
+	review_requests: true,
+	tips_received: true,
+	marketing: false,
+	weekly_reports: true
+};
 
 export interface CreateBookingInput {
 	therapistId: string;
@@ -127,6 +153,7 @@ export async function createBooking(
 
 /**
  * Send booking notification emails to client and therapist
+ * For Business tier therapists, also send WhatsApp notifications
  */
 async function sendBookingEmails(
 	supabase: SupabaseClient<Database>,
@@ -137,9 +164,10 @@ async function sendBookingEmails(
 		.from('bookings')
 		.select(`
 			*,
-			users:client_id (full_name, email),
+			users:client_id (full_name, email, phone),
 			therapists!inner (
-				users!inner (full_name, email)
+				subscription_tier,
+				users!inner (full_name, email, phone)
 			),
 			therapist_services!inner (
 				services!inner (name)
@@ -154,8 +182,11 @@ async function sendBookingEmails(
 		scheduled_at: string;
 		client_address: string;
 		price_cents: number;
-		users: { full_name: string; email: string };
-		therapists: { users: { full_name: string; email: string } };
+		users: { full_name: string; email: string; phone: string | null };
+		therapists: {
+			subscription_tier: string;
+			users: { full_name: string; email: string; phone: string | null };
+		};
 		therapist_services: { services: { name: string } };
 	};
 
@@ -170,11 +201,33 @@ async function sendBookingEmails(
 		priceCents: b.price_cents
 	};
 
-	// Send notifications in parallel
-	await Promise.all([
+	const whatsAppData = {
+		clientName: b.users.full_name,
+		therapistName: b.therapists.users.full_name,
+		serviceName: b.therapist_services.services.name,
+		scheduledAt: new Date(b.scheduled_at),
+		address: b.client_address ?? '',
+		priceCents: b.price_cents
+	};
+
+	// Send email notifications in parallel
+	const promises: Promise<unknown>[] = [
 		sendBookingConfirmationToClient(emailData),
 		sendNewBookingToTherapist(emailData)
-	]);
+	];
+
+	// Add WhatsApp notifications for Business tier and above
+	const hasWhatsApp = WHATSAPP_ENABLED_TIERS.includes(b.therapists.subscription_tier);
+	if (hasWhatsApp) {
+		if (b.users.phone) {
+			promises.push(sendBookingConfirmationWhatsApp(b.users.phone, whatsAppData));
+		}
+		if (b.therapists.users.phone) {
+			promises.push(sendNewBookingToTherapistWhatsApp(b.therapists.users.phone, whatsAppData));
+		}
+	}
+
+	await Promise.all(promises);
 }
 
 export async function getBookingById(
@@ -315,10 +368,15 @@ export async function completeBooking(
 	bookingId: string,
 	completedBy: 'client' | 'therapist'
 ): Promise<{ success: boolean; error?: string }> {
-	// Get booking with escrow info
+	// Get booking with escrow info and client email preferences
 	const { data: booking, error: fetchError } = await supabase
 		.from('bookings')
-		.select('*, therapists!inner(subscription_tier)')
+		.select(`
+			*,
+			therapists!inner(subscription_tier, users!inner(full_name)),
+			users:client_id(full_name, email, phone, email_preferences),
+			therapist_services!inner(services!inner(name))
+		`)
 		.eq('id', bookingId)
 		.single();
 
@@ -332,7 +390,19 @@ export async function completeBooking(
 		escrow_id: string | null;
 		price_cents: number;
 		commission_cents: number;
-		therapists: { subscription_tier: string };
+		scheduled_at: string;
+		client_address: string;
+		therapists: {
+			subscription_tier: string;
+			users: { full_name: string };
+		};
+		users: {
+			full_name: string;
+			email: string;
+			phone: string | null;
+			email_preferences: EmailPreferences | null;
+		};
+		therapist_services: { services: { name: string } };
 	};
 
 	if (b.status !== 'confirmed') {
@@ -359,6 +429,36 @@ export async function completeBooking(
 		if (!releaseResult.success) {
 			console.error('Error releasing escrow:', releaseResult.error);
 			// Don't fail the completion, payment will be retried via webhook
+		}
+	}
+
+	// Send review request if client has it enabled
+	const prefs = b.users.email_preferences ?? DEFAULT_PREFERENCES;
+	if (prefs.review_requests) {
+		const emailData: BookingEmailData = {
+			clientName: b.users.full_name,
+			clientEmail: b.users.email,
+			therapistName: b.therapists.users.full_name,
+			therapistEmail: '', // Not needed for review request
+			serviceName: b.therapist_services.services.name,
+			scheduledAt: new Date(b.scheduled_at),
+			address: b.client_address ?? '',
+			priceCents: b.price_cents
+		};
+		// Fire and forget - email
+		sendReviewRequest(b.users.email, b.users.full_name, emailData, bookingId).catch(console.error);
+
+		// Also send WhatsApp for Business tier if client has phone
+		if (
+			WHATSAPP_ENABLED_TIERS.includes(b.therapists.subscription_tier) &&
+			b.users.phone
+		) {
+			sendReviewRequestWhatsApp(
+				b.users.phone,
+				b.users.full_name,
+				b.therapists.users.full_name,
+				bookingId
+			).catch(console.error);
 		}
 	}
 
@@ -439,6 +539,7 @@ export async function cancelBooking(
 
 /**
  * Send cancellation notification emails
+ * For Business tier therapists, also send WhatsApp notifications
  */
 async function sendCancellationEmails(
 	supabase: SupabaseClient<Database>,
@@ -449,9 +550,10 @@ async function sendCancellationEmails(
 		.from('bookings')
 		.select(`
 			*,
-			users:client_id (full_name, email),
+			users:client_id (full_name, email, phone),
 			therapists!inner (
-				users!inner (full_name, email)
+				subscription_tier,
+				users!inner (full_name, email, phone)
 			),
 			therapist_services!inner (
 				services!inner (name)
@@ -466,8 +568,11 @@ async function sendCancellationEmails(
 		scheduled_at: string;
 		client_address: string;
 		price_cents: number;
-		users: { full_name: string; email: string };
-		therapists: { users: { full_name: string; email: string } };
+		users: { full_name: string; email: string; phone: string | null };
+		therapists: {
+			subscription_tier: string;
+			users: { full_name: string; email: string; phone: string | null };
+		};
 		therapist_services: { services: { name: string } };
 	};
 
@@ -482,8 +587,17 @@ async function sendCancellationEmails(
 		priceCents: b.price_cents
 	};
 
-	// Send to both parties
-	await Promise.all([
+	const whatsAppData = {
+		clientName: b.users.full_name,
+		therapistName: b.therapists.users.full_name,
+		serviceName: b.therapist_services.services.name,
+		scheduledAt: new Date(b.scheduled_at),
+		address: b.client_address ?? '',
+		priceCents: b.price_cents
+	};
+
+	// Send email notifications to both parties
+	const promises: Promise<unknown>[] = [
 		sendBookingCancellation(b.users.email, b.users.full_name, emailData, cancelledBy),
 		sendBookingCancellation(
 			b.therapists.users.email,
@@ -491,7 +605,28 @@ async function sendCancellationEmails(
 			emailData,
 			cancelledBy
 		)
-	]);
+	];
+
+	// Add WhatsApp notifications for Business tier and above
+	const hasWhatsApp = WHATSAPP_ENABLED_TIERS.includes(b.therapists.subscription_tier);
+	if (hasWhatsApp) {
+		if (b.users.phone) {
+			promises.push(
+				sendBookingCancellationWhatsApp(b.users.phone, b.users.full_name, whatsAppData)
+			);
+		}
+		if (b.therapists.users.phone) {
+			promises.push(
+				sendBookingCancellationWhatsApp(
+					b.therapists.users.phone,
+					b.therapists.users.full_name,
+					whatsAppData
+				)
+			);
+		}
+	}
+
+	await Promise.all(promises);
 }
 
 export async function getAvailableSlots(

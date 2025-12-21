@@ -365,6 +365,238 @@ export async function sendBookingReminder(
 }
 
 /**
+ * Send review request email after completed booking
+ */
+export async function sendReviewRequest(
+	email: string,
+	name: string,
+	data: BookingEmailData,
+	bookingId: string
+): Promise<boolean> {
+	const client = await getResend();
+	if (!client) return false;
+
+	try {
+		await client.emails.send({
+			from: 'Plenura <noreply@plenura.redbroomsoftware.com>',
+			to: email,
+			subject: `Como fue tu sesion con ${data.therapistName}?`,
+			html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0; text-align: center; }
+    .content { background: #f9fafb; padding: 30px; border-radius: 0 0 12px 12px; }
+    .stars { text-align: center; margin: 30px 0; font-size: 40px; }
+    .button { display: inline-block; background: #7c3aed; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+    .footer { text-align: center; margin-top: 30px; color: #6b7280; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 style="margin: 0;">Tu Opinion Importa</h1>
+      <p style="margin: 10px 0 0; opacity: 0.9;">Cuentanos sobre tu experiencia</p>
+    </div>
+    <div class="content">
+      <p>Hola <strong>${name}</strong>,</p>
+      <p>Esperamos que hayas disfrutado tu sesion de <strong>${data.serviceName}</strong> con <strong>${data.therapistName}</strong>.</p>
+
+      <div class="stars">
+        ⭐⭐⭐⭐⭐
+      </div>
+
+      <p>Tu calificacion ayuda a otros usuarios a encontrar los mejores terapeutas y ayuda a ${data.therapistName} a seguir mejorando.</p>
+
+      <p style="text-align: center; margin-top: 30px;">
+        <a href="https://plenura.redbroomsoftware.com/bookings/${bookingId}/review" class="button">Dejar Resena</a>
+      </p>
+
+      <div class="footer">
+        <p>Gracias por usar Plenura.</p>
+        <p>&copy; 2024 Plenura. Todos los derechos reservados.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+			`
+		});
+		return true;
+	} catch (error) {
+		console.error('Error sending review request email:', error);
+		return false;
+	}
+}
+
+/**
+ * Send tip received notification to therapist
+ */
+export async function sendTipNotification(
+	therapistEmail: string,
+	therapistName: string,
+	clientName: string,
+	amountCents: number,
+	serviceName: string
+): Promise<boolean> {
+	const client = await getResend();
+	if (!client) return false;
+
+	try {
+		await client.emails.send({
+			from: 'Plenura <noreply@plenura.redbroomsoftware.com>',
+			to: therapistEmail,
+			subject: `${clientName} te envio una propina!`,
+			html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0; text-align: center; }
+    .content { background: #f9fafb; padding: 30px; border-radius: 0 0 12px 12px; }
+    .amount-box { background: white; border-radius: 12px; padding: 30px; margin: 20px 0; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .amount { font-size: 48px; font-weight: 700; color: #059669; }
+    .button { display: inline-block; background: #059669; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+    .footer { text-align: center; margin-top: 30px; color: #6b7280; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 style="margin: 0;">Recibiste una Propina!</h1>
+      <p style="margin: 10px 0 0; opacity: 0.9;">Tu cliente esta agradecido</p>
+    </div>
+    <div class="content">
+      <p>Hola <strong>${therapistName}</strong>,</p>
+      <p><strong>${clientName}</strong> te envio una propina por tu excelente servicio de <strong>${serviceName}</strong>.</p>
+
+      <div class="amount-box">
+        <div class="amount">${formatPrice(amountCents)}</div>
+        <p style="margin: 10px 0 0; color: #6b7280;">Propina recibida</p>
+      </div>
+
+      <p>El monto sera agregado a tu proximo pago. Sigue brindando un excelente servicio!</p>
+
+      <p style="text-align: center; margin-top: 30px;">
+        <a href="https://plenura.redbroomsoftware.com/therapist/earnings" class="button">Ver Ganancias</a>
+      </p>
+
+      <div class="footer">
+        <p>&copy; 2024 Plenura. Todos los derechos reservados.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+			`
+		});
+		return true;
+	} catch (error) {
+		console.error('Error sending tip notification email:', error);
+		return false;
+	}
+}
+
+/**
+ * Send weekly report to therapist (premium feature)
+ */
+export async function sendWeeklyReport(
+	therapistEmail: string,
+	therapistName: string,
+	stats: {
+		bookingsCompleted: number;
+		totalEarningsCents: number;
+		tipsCents: number;
+		avgRating: number;
+		newReviews: number;
+	}
+): Promise<boolean> {
+	const client = await getResend();
+	if (!client) return false;
+
+	try {
+		await client.emails.send({
+			from: 'Plenura <noreply@plenura.redbroomsoftware.com>',
+			to: therapistEmail,
+			subject: 'Tu resumen semanal en Plenura',
+			html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0; text-align: center; }
+    .content { background: #f9fafb; padding: 30px; border-radius: 0 0 12px 12px; }
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0; }
+    .stat-card { background: white; border-radius: 8px; padding: 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .stat-value { font-size: 28px; font-weight: 700; color: #7c3aed; }
+    .stat-label { font-size: 14px; color: #6b7280; margin-top: 5px; }
+    .button { display: inline-block; background: #7c3aed; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+    .footer { text-align: center; margin-top: 30px; color: #6b7280; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 style="margin: 0;">Resumen Semanal</h1>
+      <p style="margin: 10px 0 0; opacity: 0.9;">Tu rendimiento de la semana</p>
+    </div>
+    <div class="content">
+      <p>Hola <strong>${therapistName}</strong>,</p>
+      <p>Aqui esta tu resumen de la ultima semana:</p>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value">${stats.bookingsCompleted}</div>
+          <div class="stat-label">Citas completadas</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">${formatPrice(stats.totalEarningsCents)}</div>
+          <div class="stat-label">Ganancias totales</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">${formatPrice(stats.tipsCents)}</div>
+          <div class="stat-label">Propinas recibidas</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">${stats.avgRating > 0 ? stats.avgRating.toFixed(1) : '-'} ⭐</div>
+          <div class="stat-label">Calificacion promedio</div>
+        </div>
+      </div>
+
+      ${stats.newReviews > 0 ? `<p>Recibiste <strong>${stats.newReviews} nueva${stats.newReviews > 1 ? 's' : ''} resena${stats.newReviews > 1 ? 's' : ''}</strong> esta semana.</p>` : ''}
+
+      <p style="text-align: center; margin-top: 30px;">
+        <a href="https://plenura.redbroomsoftware.com/therapist" class="button">Ver Dashboard</a>
+      </p>
+
+      <div class="footer">
+        <p>Sigue asi! Tu dedicacion marca la diferencia.</p>
+        <p>&copy; 2024 Plenura. Todos los derechos reservados.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+			`
+		});
+		return true;
+	} catch (error) {
+		console.error('Error sending weekly report email:', error);
+		return false;
+	}
+}
+
+/**
  * Send welcome email to new user
  */
 export async function sendWelcomeEmail(email: string, name: string): Promise<boolean> {

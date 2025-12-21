@@ -1,8 +1,13 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
+	import ShareButton from '$lib/components/ShareButton.svelte';
+	import { PUBLIC_APP_URL } from '$env/static/public';
 
 	let { data } = $props();
+
+	// Profile URL for sharing
+	const profileUrl = `${PUBLIC_APP_URL}/therapists/${data.therapistProfile?.id}`;
 
 	let savingUser = $state(false);
 	let savingTherapist = $state(false);
@@ -311,6 +316,56 @@
 					{data.therapistProfile?.years_of_experience ?? 0}
 				</p>
 				<p class="text-sm text-gray-500">Años exp.</p>
+			</div>
+		</div>
+	</div>
+
+	<!-- Share Your Profile -->
+	<div class="bg-white rounded-xl border border-gray-100 p-4">
+		<h2 class="font-semibold text-gray-900 mb-4">Comparte tu Perfil</h2>
+		<p class="text-sm text-gray-600 mb-4">
+			Comparte tu perfil con clientes potenciales para conseguir más reservas.
+		</p>
+
+		<div class="flex flex-col sm:flex-row gap-4">
+			<!-- Profile Link -->
+			<div class="flex-1">
+				<label for="profile-url" class="block text-sm font-medium text-gray-700 mb-1">
+					Enlace a tu perfil
+				</label>
+				<div class="flex gap-2">
+					<input
+						type="text"
+						id="profile-url"
+						value={profileUrl}
+						readonly
+						class="input-wellness bg-gray-50 text-sm flex-1"
+					/>
+					<ShareButton
+						title={data.userProfile?.full_name ?? 'Terapeuta en Plenura'}
+						text={`Conoce a ${data.userProfile?.full_name ?? 'este terapeuta'} en Plenura`}
+						url={profileUrl}
+						variant="button"
+					/>
+				</div>
+			</div>
+		</div>
+
+		<!-- QR Code Section -->
+		<div class="mt-6 pt-6 border-t border-gray-100">
+			<div class="flex items-center justify-between">
+				<div>
+					<h3 class="font-medium text-gray-900">Código QR</h3>
+					<p class="text-sm text-gray-500">
+						Descarga tu código QR para usar en tarjetas de presentación
+					</p>
+				</div>
+				<a
+					href="/therapist/qr"
+					class="px-4 py-2 bg-primary-50 text-primary-700 rounded-lg hover:bg-primary-100 transition-colors font-medium"
+				>
+					Ver y Descargar QR
+				</a>
 			</div>
 		</div>
 	</div>

@@ -1,5 +1,26 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '$types/database.types';
+import { sendTipNotification } from './email.service';
+import { sendTipNotificationWhatsApp } from './whatsapp.service';
+
+interface EmailPreferences {
+	booking_reminders: boolean;
+	review_requests: boolean;
+	tips_received: boolean;
+	marketing: boolean;
+	weekly_reports: boolean;
+}
+
+const DEFAULT_PREFERENCES: EmailPreferences = {
+	booking_reminders: true,
+	review_requests: true,
+	tips_received: true,
+	marketing: false,
+	weekly_reports: true
+};
+
+// Subscription tiers that have WhatsApp enabled
+const WHATSAPP_ENABLED_TIERS = ['business', 'enterprise'];
 
 export interface TipInput {
 	bookingId: string;
@@ -18,7 +39,17 @@ export async function sendTip(
 	// Verify booking exists and belongs to user
 	const { data: booking, error: fetchError } = await supabase
 		.from('bookings')
-		.select('id, therapist_id, client_id, status')
+		.select(
+			`
+			id, therapist_id, client_id, status,
+			client:users!bookings_client_id_fkey(full_name),
+			therapist:therapists!bookings_therapist_id_fkey(
+				subscription_tier,
+				user:users!therapists_user_id_fkey(full_name, email, phone, email_preferences)
+			),
+			service:services!bookings_service_id_fkey(name)
+		`
+		)
 		.eq('id', input.bookingId)
 		.single();
 
@@ -26,7 +57,23 @@ export async function sendTip(
 		return { success: false, error: 'Reserva no encontrada' };
 	}
 
-	const b = booking as { id: string; therapist_id: string; client_id: string; status: string };
+	const b = booking as unknown as {
+		id: string;
+		therapist_id: string;
+		client_id: string;
+		status: string;
+		client: { full_name: string };
+		therapist: {
+			subscription_tier: string;
+			user: {
+				full_name: string;
+				email: string;
+				phone: string | null;
+				email_preferences: EmailPreferences | null;
+			};
+		};
+		service: { name: string };
+	};
 
 	if (b.client_id !== userId) {
 		return { success: false, error: 'No autorizado' };
@@ -51,8 +98,31 @@ export async function sendTip(
 		return { success: false, error: 'Error al procesar la propina' };
 	}
 
-	// In production, this would trigger a payment to the therapist
-	// For now, we'll just record it
+	// Send tip notification if therapist has it enabled
+	const prefs = b.therapist.user.email_preferences ?? DEFAULT_PREFERENCES;
+	if (prefs.tips_received) {
+		// Send email
+		await sendTipNotification(
+			b.therapist.user.email,
+			b.therapist.user.full_name,
+			b.client.full_name,
+			input.amountCents,
+			b.service.name
+		);
+
+		// Also send WhatsApp for Business tier if therapist has phone
+		if (
+			WHATSAPP_ENABLED_TIERS.includes(b.therapist.subscription_tier) &&
+			b.therapist.user.phone
+		) {
+			sendTipNotificationWhatsApp(
+				b.therapist.user.phone,
+				b.therapist.user.full_name,
+				b.client.full_name,
+				input.amountCents
+			).catch(console.error);
+		}
+	}
 
 	return { success: true };
 }
