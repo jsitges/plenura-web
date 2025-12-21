@@ -51,6 +51,9 @@ export async function searchTherapists(
 		`)
 		.eq('vetting_status', 'approved')
 		.eq('is_available', true)
+		// Featured therapists first, then by rating
+		.order('is_featured', { ascending: false, nullsFirst: false })
+		.order('featured_until', { ascending: false, nullsFirst: true })
 		.order('rating_avg', { ascending: false });
 
 	// Filter by category

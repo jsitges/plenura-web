@@ -1,6 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { error, fail, redirect } from '@sveltejs/kit';
 import { createReview, getBookingReview } from '$lib/services/review.service';
+import { sendTip } from '$lib/services/tips.service';
 
 interface BookingWithTherapist {
 	id: string;
@@ -84,7 +85,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 };
 
 export const actions: Actions = {
-	default: async ({ request, params, locals }) => {
+	review: async ({ request, params, locals }) => {
 		const { supabase, user } = locals;
 
 		if (!user) {
@@ -114,5 +115,31 @@ export const actions: Actions = {
 		}
 
 		throw redirect(303, '/bookings?reviewed=true');
+	},
+
+	tip: async ({ request, params, locals }) => {
+		const { supabase, user } = locals;
+
+		if (!user) {
+			throw redirect(303, '/login');
+		}
+
+		const formData = await request.formData();
+		const amountCents = parseInt(formData.get('amount_cents') as string, 10);
+
+		if (isNaN(amountCents) || amountCents < 100) {
+			return fail(400, { tipError: 'Monto de propina inválido' });
+		}
+
+		const result = await sendTip(supabase, user.id, {
+			bookingId: params.id,
+			amountCents
+		});
+
+		if (!result.success) {
+			return fail(400, { tipError: result.error });
+		}
+
+		return { tipSuccess: true };
 	}
 };

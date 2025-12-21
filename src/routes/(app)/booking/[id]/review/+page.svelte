@@ -1,13 +1,21 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 
-	let { data } = $props();
+	let { data, form } = $props();
 
 	let rating = $state(5);
 	let comment = $state('');
 	let isPublic = $state(true);
 	let submitting = $state(false);
 	let hoverRating = $state(0);
+	let selectedTip = $state<number | null>(null);
+	let customTip = $state('');
+	let tipping = $state(false);
+
+	const tipAmounts = [2000, 5000, 10000]; // $20, $50, $100 MXN
+
+	const formatPrice = (cents: number) =>
+		new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(cents / 100);
 
 	function formatDate(dateString: string): string {
 		return new Date(dateString).toLocaleDateString('es-MX', {
@@ -87,6 +95,7 @@
 			<!-- Review form -->
 			<form
 				method="POST"
+				action="?/review"
 				use:enhance={() => {
 					submitting = true;
 					return async ({ update }) => {
@@ -194,7 +203,77 @@
 			</form>
 		</div>
 
-		<!-- Tips -->
+		<!-- Tip the therapist -->
+		<div class="mt-6 bg-white rounded-xl border border-gray-100 p-6">
+			<h3 class="font-semibold text-gray-900 mb-2">¿Te gustó el servicio?</h3>
+			<p class="text-sm text-gray-500 mb-4">Deja una propina para agradecer a tu terapeuta. Las propinas van 100% al terapeuta.</p>
+
+			{#if form?.tipSuccess}
+				<div class="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+					<svg class="w-8 h-8 text-green-600 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+					</svg>
+					<p class="text-green-700 font-medium">¡Gracias por tu propina!</p>
+				</div>
+			{:else}
+				<form
+					method="POST"
+					action="?/tip"
+					use:enhance={() => {
+						tipping = true;
+						return async ({ update }) => {
+							await update();
+							tipping = false;
+						};
+					}}
+				>
+					<div class="flex gap-2 mb-4">
+						{#each tipAmounts as amount}
+							<button
+								type="button"
+								onclick={() => { selectedTip = amount; customTip = ''; }}
+								class="flex-1 py-3 px-4 rounded-lg font-medium transition-colors {selectedTip === amount ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
+							>
+								{formatPrice(amount)}
+							</button>
+						{/each}
+					</div>
+
+					<div class="mb-4">
+						<label for="custom_tip" class="block text-sm text-gray-600 mb-1">O ingresa otro monto:</label>
+						<div class="relative">
+							<span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+							<input
+								type="number"
+								id="custom_tip"
+								bind:value={customTip}
+								onfocus={() => selectedTip = null}
+								min="10"
+								step="10"
+								placeholder="0"
+								class="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+							/>
+						</div>
+					</div>
+
+					<input type="hidden" name="amount_cents" value={selectedTip ?? (customTip ? parseInt(customTip) * 100 : 0)} />
+
+					{#if form?.tipError}
+						<p class="text-red-600 text-sm mb-3">{form.tipError}</p>
+					{/if}
+
+					<button
+						type="submit"
+						disabled={tipping || (!selectedTip && !customTip)}
+						class="w-full py-3 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+					>
+						{tipping ? 'Enviando...' : 'Enviar propina'}
+					</button>
+				</form>
+			{/if}
+		</div>
+
+		<!-- Tips (advice) -->
 		<div class="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
 			<h3 class="font-medium text-blue-800 mb-2">Consejos para una buena reseña</h3>
 			<ul class="text-sm text-blue-700 space-y-1">
