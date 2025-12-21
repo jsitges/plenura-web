@@ -1,8 +1,17 @@
 import { createServerSupabaseClient } from '$lib/supabase/server';
-import type { Handle } from '@sveltejs/kit';
+import type { Handle, HandleServerError } from '@sveltejs/kit';
 import type { Tables } from '$lib/types/database.types';
+import * as Sentry from '@sentry/sveltekit';
+import { sequence } from '@sveltejs/kit/hooks';
 
-export const handle: Handle = async ({ event, resolve }) => {
+// Initialize Sentry
+Sentry.init({
+	dsn: process.env.VITE_PUBLIC_SENTRY_DSN,
+	environment: process.env.NODE_ENV,
+	tracesSampleRate: 1.0
+});
+
+const supabaseHandle: Handle = async ({ event, resolve }) => {
 	// Create Supabase client for this request
 	const supabase = createServerSupabaseClient(event);
 
@@ -46,3 +55,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 	});
 };
+
+// Combine Sentry and Supabase handles
+export const handle = sequence(Sentry.sentryHandle(), supabaseHandle);
+
+// Error handler with Sentry
+export const handleError: HandleServerError = Sentry.handleErrorWithSentry();
