@@ -7,6 +7,12 @@ import {
 	releaseEscrow,
 	refundEscrow
 } from './payment.service';
+import {
+	sendBookingConfirmationToClient,
+	sendNewBookingToTherapist,
+	sendBookingCancellation,
+	type BookingEmailData
+} from './email.service';
 
 export interface CreateBookingInput {
 	therapistId: string;
@@ -113,7 +119,62 @@ export async function createBooking(
 		return { data: null, error: 'Error al crear la reserva' };
 	}
 
+	// Send email notifications (fire and forget)
+	sendBookingEmails(supabase, data.id).catch(console.error);
+
 	return { data: data as Tables<'bookings'>, error: null };
+}
+
+/**
+ * Send booking notification emails to client and therapist
+ */
+async function sendBookingEmails(
+	supabase: SupabaseClient<Database>,
+	bookingId: string
+): Promise<void> {
+	// Fetch full booking details with user info
+	const { data: booking } = await supabase
+		.from('bookings')
+		.select(`
+			*,
+			users:client_id (full_name, email),
+			therapists!inner (
+				users!inner (full_name, email)
+			),
+			therapist_services!inner (
+				services!inner (name)
+			)
+		`)
+		.eq('id', bookingId)
+		.single();
+
+	if (!booking) return;
+
+	const b = booking as unknown as {
+		scheduled_at: string;
+		client_address: string;
+		price_cents: number;
+		users: { full_name: string; email: string };
+		therapists: { users: { full_name: string; email: string } };
+		therapist_services: { services: { name: string } };
+	};
+
+	const emailData: BookingEmailData = {
+		clientName: b.users.full_name,
+		clientEmail: b.users.email,
+		therapistName: b.therapists.users.full_name,
+		therapistEmail: b.therapists.users.email,
+		serviceName: b.therapist_services.services.name,
+		scheduledAt: new Date(b.scheduled_at),
+		address: b.client_address ?? '',
+		priceCents: b.price_cents
+	};
+
+	// Send notifications in parallel
+	await Promise.all([
+		sendBookingConfirmationToClient(emailData),
+		sendNewBookingToTherapist(emailData)
+	]);
 }
 
 export async function getBookingById(
@@ -370,7 +431,67 @@ export async function cancelBooking(
 		}
 	}
 
+	// Send cancellation emails (fire and forget)
+	sendCancellationEmails(supabase, bookingId, cancelledBy).catch(console.error);
+
 	return { success: true, refundAmount };
+}
+
+/**
+ * Send cancellation notification emails
+ */
+async function sendCancellationEmails(
+	supabase: SupabaseClient<Database>,
+	bookingId: string,
+	cancelledBy: 'client' | 'therapist'
+): Promise<void> {
+	const { data: booking } = await supabase
+		.from('bookings')
+		.select(`
+			*,
+			users:client_id (full_name, email),
+			therapists!inner (
+				users!inner (full_name, email)
+			),
+			therapist_services!inner (
+				services!inner (name)
+			)
+		`)
+		.eq('id', bookingId)
+		.single();
+
+	if (!booking) return;
+
+	const b = booking as unknown as {
+		scheduled_at: string;
+		client_address: string;
+		price_cents: number;
+		users: { full_name: string; email: string };
+		therapists: { users: { full_name: string; email: string } };
+		therapist_services: { services: { name: string } };
+	};
+
+	const emailData: BookingEmailData = {
+		clientName: b.users.full_name,
+		clientEmail: b.users.email,
+		therapistName: b.therapists.users.full_name,
+		therapistEmail: b.therapists.users.email,
+		serviceName: b.therapist_services.services.name,
+		scheduledAt: new Date(b.scheduled_at),
+		address: b.client_address ?? '',
+		priceCents: b.price_cents
+	};
+
+	// Send to both parties
+	await Promise.all([
+		sendBookingCancellation(b.users.email, b.users.full_name, emailData, cancelledBy),
+		sendBookingCancellation(
+			b.therapists.users.email,
+			b.therapists.users.full_name,
+			emailData,
+			cancelledBy
+		)
+	]);
 }
 
 export async function getAvailableSlots(

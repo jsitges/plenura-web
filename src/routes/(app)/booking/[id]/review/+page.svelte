@@ -109,6 +109,7 @@
 								onmouseenter={() => (hoverRating = star)}
 								onmouseleave={() => (hoverRating = 0)}
 								class="p-1 transition-transform hover:scale-110 focus:outline-none"
+								aria-label="{star} estrella{star > 1 ? 's' : ''}"
 							>
 								<svg
 									class="w-10 h-10 {(hoverRating || rating) >= star
