@@ -36,12 +36,14 @@ export async function sendTip(
 		return { success: false, error: 'Solo puedes dar propina en reservas completadas' };
 	}
 
-	// Record the tip
+	// Record the tip (100% goes to therapist, no platform fee)
 	const { error: insertError } = await supabase.from('tips').insert({
 		booking_id: input.bookingId,
 		client_id: userId,
 		therapist_id: b.therapist_id,
-		amount_cents: input.amountCents
+		amount_cents: input.amountCents,
+		plenura_fee_cents: 0,
+		therapist_amount_cents: input.amountCents
 	});
 
 	if (insertError) {
