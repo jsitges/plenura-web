@@ -70,6 +70,8 @@
 		loading = true;
 
 		try {
+			console.log('[Register] Attempting signup for:', email);
+
 			const { data, error: authError } = await supabase.auth.signUp({
 				email,
 				password,
@@ -84,27 +86,60 @@
 				}
 			});
 
+			console.log('[Register] Signup response:', {
+				hasUser: !!data.user,
+				hasSession: !!data.session,
+				identitiesCount: data.user?.identities?.length,
+				errorCode: authError?.code,
+				errorMessage: authError?.message
+			});
+
 			if (authError) {
-				if (authError.message.includes('already registered')) {
-					error = 'Este correo ya está registrado. ¿Quieres iniciar sesión?';
+				console.error('[Register] Auth error:', authError);
+
+				// More specific error messages
+				const msg = authError.message.toLowerCase();
+				if (msg.includes('already registered') || msg.includes('user already exists')) {
+					error = 'Este correo electrónico ya está registrado. ¿Quieres iniciar sesión?';
+				} else if (msg.includes('rate limit') || msg.includes('too many')) {
+					error = 'Demasiados intentos. Por favor espera unos minutos e intenta de nuevo.';
+				} else if (msg.includes('invalid email')) {
+					error = 'El correo electrónico no es válido. Verifica que esté bien escrito.';
+				} else if (msg.includes('password')) {
+					error = 'La contraseña no cumple con los requisitos. Debe tener al menos 8 caracteres.';
+				} else if (msg.includes('network') || msg.includes('fetch')) {
+					error = 'Error de conexión. Verifica tu internet e intenta de nuevo.';
+				} else if (msg.includes('email') && msg.includes('sending')) {
+					error = 'No pudimos enviar el correo de verificación. Por favor intenta de nuevo más tarde.';
 				} else {
-					error = authError.message;
+					error = `Error: ${authError.message}`;
 				}
 				return;
 			}
 
 			if (data.user) {
-				// Check if email confirmation is required
+				// Check if email confirmation is required (identities empty = user already exists)
 				if (data.user.identities?.length === 0) {
-					error = 'Este correo ya está registrado';
+					console.warn('[Register] User exists but identities empty - duplicate email');
+					error = 'Este correo electrónico ya está registrado en Plenura. Si olvidaste tu contraseña, puedes restablecerla desde el login.';
 					return;
 				}
 
-				// Redirect to confirmation page or dashboard
-				goto('/register/confirm?email=' + encodeURIComponent(email));
+				// Check if we got a session (auto-confirm is enabled) or need email verification
+				if (data.session) {
+					console.log('[Register] Auto-confirmed, redirecting to dashboard');
+					goto('/dashboard');
+				} else {
+					console.log('[Register] Email confirmation required, redirecting to confirm page');
+					goto('/register/confirm?email=' + encodeURIComponent(email));
+				}
+			} else {
+				console.warn('[Register] No user returned and no error');
+				error = 'No se pudo crear la cuenta. Por favor intenta de nuevo.';
 			}
 		} catch (err) {
-			error = 'Error al crear la cuenta. Intenta de nuevo.';
+			console.error('[Register] Unexpected error:', err);
+			error = 'Error inesperado al crear la cuenta. Por favor intenta de nuevo.';
 		} finally {
 			loading = false;
 		}
@@ -142,9 +177,17 @@
 
 	{#if error}
 		<div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm">
-			{error}
-			{#if error.includes('iniciar sesión')}
-				<a href="/login" class="underline ml-1">Ir a login</a>
+			<p>{error}</p>
+			{#if error.includes('ya está registrado') || error.includes('iniciar sesión')}
+				<div class="mt-2 flex gap-3">
+					<a href="/login" class="inline-flex items-center text-red-800 hover:text-red-900 underline font-medium">
+						Iniciar sesión
+					</a>
+					<span class="text-red-400">|</span>
+					<a href="/login?forgot=true" class="inline-flex items-center text-red-800 hover:text-red-900 underline font-medium">
+						¿Olvidaste tu contraseña?
+					</a>
+				</div>
 			{/if}
 		</div>
 	{/if}
