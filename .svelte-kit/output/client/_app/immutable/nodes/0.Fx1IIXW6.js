@@ -1,0 +1,1 @@
+import"../chunks/Bzak7iHL.js";import{c as r,f as n,a as m,e as s,$ as c}from"../chunks/DCMERdpK.js";import{s as i}from"../chunks/BpdVmXgk.js";import{h as f}from"../chunks/B1_jHp8y.js";function $(e,t){var a=r();f("12qhfyh",p=>{s(()=>{c.title="Plenura - Bienestar a tu alcance"})});var o=n(a);i(o,()=>t.children),m(e,a)}export{$ as component};

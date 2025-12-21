@@ -1,0 +1,1 @@
+import{D as u,E as o,an as _,H as t,I as g,Q as p,a5 as i,O as l,G as n,P as E}from"./DCMERdpK.js";function v(d,r){let a=null,f=t;var s;if(t){a=E;for(var e=g(document.head);e!==null&&(e.nodeType!==p||e.data!==d);)e=i(e);if(e===null)l(!1);else{var y=i(e);e.remove(),n(y)}}t||(s=document.head.appendChild(u()));try{o(()=>r(s),_)}finally{f&&(l(!0),n(a))}}export{v as h};

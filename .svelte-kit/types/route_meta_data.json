@@ -1,0 +1,117 @@
+{
+	"/(auth)": [
+		"src/routes/+layout.server.ts"
+	],
+	"/(app)": [
+		"src/routes/(app)/+layout.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/": [
+		"src/routes/+layout.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/api/webhooks/colectiva": [
+		"src/routes/api/webhooks/colectiva/+server.ts"
+	],
+	"/(app)/bookings": [
+		"src/routes/(app)/bookings/+page.server.ts",
+		"src/routes/(app)/+layout.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/(app)/booking/new": [
+		"src/routes/(app)/booking/new/+page.server.ts",
+		"src/routes/(app)/+layout.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/(app)/booking/[id]/confirmation": [
+		"src/routes/(app)/booking/[id]/confirmation/+page.server.ts",
+		"src/routes/(app)/+layout.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/(app)/booking/[id]/review": [
+		"src/routes/(app)/booking/[id]/review/+page.server.ts",
+		"src/routes/(app)/+layout.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/(auth)/callback": [
+		"src/routes/(auth)/callback/+server.ts"
+	],
+	"/(app)/dashboard": [
+		"src/routes/(app)/+layout.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/(app)/favorites": [
+		"src/routes/(app)/favorites/+page.server.ts",
+		"src/routes/(app)/+layout.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/(auth)/login": [
+		"src/routes/+layout.server.ts"
+	],
+	"/(app)/referrals": [
+		"src/routes/(app)/referrals/+page.server.ts",
+		"src/routes/(app)/+layout.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/(auth)/register": [
+		"src/routes/+layout.server.ts"
+	],
+	"/(auth)/register/confirm": [
+		"src/routes/+layout.server.ts"
+	],
+	"/(app)/therapists": [
+		"src/routes/(app)/therapists/+page.server.ts",
+		"src/routes/(app)/+layout.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/(app)/therapists/[id]": [
+		"src/routes/(app)/therapists/[id]/+page.server.ts",
+		"src/routes/(app)/+layout.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/(app)/therapist": [
+		"src/routes/(app)/therapist/+page.server.ts",
+		"src/routes/(app)/therapist/+layout.server.ts",
+		"src/routes/(app)/+layout.server.ts",
+		"src/routes/+layout.server.ts",
+		"src/routes/(app)/therapist/+layout.server.ts",
+		"src/routes/(app)/+layout.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/(app)/therapist/availability": [
+		"src/routes/(app)/therapist/availability/+page.server.ts",
+		"src/routes/(app)/therapist/+layout.server.ts",
+		"src/routes/(app)/+layout.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/(app)/therapist/bookings": [
+		"src/routes/(app)/therapist/bookings/+page.server.ts",
+		"src/routes/(app)/therapist/+layout.server.ts",
+		"src/routes/(app)/+layout.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/(app)/therapist/earnings": [
+		"src/routes/(app)/therapist/earnings/+page.server.ts",
+		"src/routes/(app)/therapist/+layout.server.ts",
+		"src/routes/(app)/+layout.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/(app)/therapist/profile": [
+		"src/routes/(app)/therapist/profile/+page.server.ts",
+		"src/routes/(app)/therapist/+layout.server.ts",
+		"src/routes/(app)/+layout.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/(app)/therapist/services": [
+		"src/routes/(app)/therapist/services/+page.server.ts",
+		"src/routes/(app)/therapist/+layout.server.ts",
+		"src/routes/(app)/+layout.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/(app)/therapist/subscription": [
+		"src/routes/(app)/therapist/subscription/+page.server.ts",
+		"src/routes/(app)/therapist/+layout.server.ts",
+		"src/routes/(app)/+layout.server.ts",
+		"src/routes/+layout.server.ts"
+	]
+}
