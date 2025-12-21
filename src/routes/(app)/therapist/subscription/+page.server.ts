@@ -1,134 +1,153 @@
-import { redirect, fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 
-const SUBSCRIPTION_TIERS = {
-	free: {
-		name: 'Free',
-		price: 0,
+const SUBSCRIPTION_TIERS = [
+	{
+		id: 'free',
+		name: 'Gratis',
+		priceCents: 0,
 		commission: 10,
-		features: ['Hasta 5 citas/mes', 'Perfil básico', 'Soporte por email']
+		features: [
+			'5 reservas por mes',
+			'Perfil básico',
+			'Soporte por email'
+		],
+		limits: {
+			monthlyBookings: 5
+		}
 	},
-	pro: {
+	{
+		id: 'pro',
 		name: 'Pro',
-		price: 299,
+		priceCents: 29900, // $299 MXN/month
 		commission: 5,
-		features: ['Citas ilimitadas', 'Perfil destacado', 'Estadísticas avanzadas', 'Soporte prioritario']
+		features: [
+			'Reservas ilimitadas',
+			'5% de comisión',
+			'Perfil destacado',
+			'Estadísticas avanzadas',
+			'Soporte prioritario'
+		],
+		limits: {
+			monthlyBookings: -1 // unlimited
+		},
+		popular: true
 	},
-	business: {
+	{
+		id: 'business',
 		name: 'Business',
-		price: 699,
+		priceCents: 69900, // $699 MXN/month
 		commission: 3,
 		features: [
-			'Todo de Pro',
-			'Integración WhatsApp',
-			'Multi-ubicación',
+			'Reservas ilimitadas',
+			'3% de comisión',
+			'Notificaciones WhatsApp',
 			'Recordatorios automáticos',
-			'Facturación automática'
-		]
+			'Reportes mensuales',
+			'Soporte 24/7'
+		],
+		limits: {
+			monthlyBookings: -1
+		}
 	},
-	enterprise: {
+	{
+		id: 'enterprise',
 		name: 'Enterprise',
-		price: 1299,
+		priceCents: 129900, // $1,299 MXN/month
 		commission: 0,
 		features: [
-			'Todo de Business',
-			'0% comisión',
-			'Account manager dedicado',
+			'Sin comisión',
+			'Facturación incluida',
 			'API access',
-			'Personalización de marca',
-			'Reportes personalizados'
-		]
+			'Marca blanca',
+			'Gerente de cuenta dedicado',
+			'Integraciones personalizadas'
+		],
+		limits: {
+			monthlyBookings: -1
+		}
 	}
-};
+];
 
 export const load: PageServerLoad = async ({ locals }) => {
-	const { supabase, user } = locals;
+	const { supabase, user, therapistProfile } = locals;
 
 	if (!user) {
 		throw redirect(303, '/login');
 	}
 
-	const { data: therapist } = await supabase
-		.from('therapists')
-		.select('id, subscription_tier, subscription_expires_at')
-		.eq('user_id', user.id)
-		.single();
-
-	if (!therapist) {
+	if (!therapistProfile) {
 		throw redirect(303, '/dashboard');
 	}
 
-	const t = therapist as {
-		id: string;
-		subscription_tier: string;
-		subscription_expires_at: string | null;
-	};
+	// Get subscription history
+	const { data: subscriptionHistory } = await supabase
+		.from('subscription_history')
+		.select('*')
+		.eq('therapist_id', therapistProfile.id)
+		.order('created_at', { ascending: false })
+		.limit(5);
 
 	return {
-		currentTier: t.subscription_tier ?? 'free',
-		expiresAt: t.subscription_expires_at,
-		tiers: SUBSCRIPTION_TIERS
+		currentTier: therapistProfile.subscription_tier ?? 'free',
+		monthlyBookingCount: therapistProfile.monthly_booking_count ?? 0,
+		tiers: SUBSCRIPTION_TIERS,
+		subscriptionHistory: subscriptionHistory ?? []
 	};
 };
 
 export const actions: Actions = {
 	upgrade: async ({ request, locals }) => {
-		const { supabase, user } = locals;
+		const { supabase, user, therapistProfile } = locals;
 
-		if (!user) {
+		if (!user || !therapistProfile) {
 			throw redirect(303, '/login');
 		}
 
 		const formData = await request.formData();
-		const tier = formData.get('tier') as string;
+		const tierId = formData.get('tierId') as string;
 
-		if (!tier || !['pro', 'business', 'enterprise'].includes(tier)) {
+		const selectedTier = SUBSCRIPTION_TIERS.find(t => t.id === tierId);
+		if (!selectedTier) {
 			return fail(400, { error: 'Plan no válido' });
 		}
 
-		// In a real implementation, this would:
-		// 1. Create a Stripe/payment checkout session
-		// 2. Redirect to payment
-		// 3. On webhook success, update the subscription
+		if (selectedTier.id === 'free') {
+			// Downgrade to free
+			const { error } = await supabase
+				.from('therapists')
+				.update({ subscription_tier: 'free' })
+				.eq('id', therapistProfile.id);
 
-		// For now, we'll just simulate the upgrade
-		const expiresAt = new Date();
-		expiresAt.setMonth(expiresAt.getMonth() + 1);
+			if (error) {
+				return fail(500, { error: 'Error al cambiar plan' });
+			}
 
+			return { success: true, message: 'Plan actualizado a Gratis' };
+		}
+
+		// For paid tiers, in production this would redirect to payment
+		// For now, we'll simulate the upgrade
 		const { error } = await supabase
 			.from('therapists')
-			.update({
-				subscription_tier: tier,
-				subscription_expires_at: expiresAt.toISOString()
-			})
-			.eq('user_id', user.id);
+			.update({ subscription_tier: selectedTier.id })
+			.eq('id', therapistProfile.id);
 
 		if (error) {
-			return fail(500, { error: 'Error al actualizar suscripción' });
+			return fail(500, { error: 'Error al procesar la suscripción' });
 		}
 
-		return { success: true, message: `¡Bienvenido al plan ${SUBSCRIPTION_TIERS[tier as keyof typeof SUBSCRIPTION_TIERS].name}!` };
-	},
+		// Record subscription change
+		await supabase.from('subscription_history').insert({
+			therapist_id: therapistProfile.id,
+			tier: selectedTier.id,
+			price_cents: selectedTier.priceCents,
+			status: 'active'
+		});
 
-	cancel: async ({ locals }) => {
-		const { supabase, user } = locals;
-
-		if (!user) {
-			throw redirect(303, '/login');
-		}
-
-		const { error } = await supabase
-			.from('therapists')
-			.update({
-				subscription_tier: 'free',
-				subscription_expires_at: null
-			})
-			.eq('user_id', user.id);
-
-		if (error) {
-			return fail(500, { error: 'Error al cancelar suscripción' });
-		}
-
-		return { success: true, message: 'Suscripción cancelada. Volverás al plan Free.' };
+		return {
+			success: true,
+			message: `¡Bienvenido al plan ${selectedTier.name}!`
+		};
 	}
 };
