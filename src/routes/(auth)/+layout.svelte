@@ -6,11 +6,9 @@
 	<div class="w-full max-w-md">
 		<!-- Logo -->
 		<div class="text-center mb-8">
-			<a href="/" class="inline-flex items-center gap-2">
-				<div class="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
-					<span class="text-white text-xl">🌿</span>
-				</div>
-				<span class="text-2xl font-bold bg-gradient-to-r from-primary-600 to-primary-700 bg-clip-text text-transparent">
+			<a href="/" class="inline-flex items-center gap-3">
+				<img src="/logo.svg" alt="Plenura" class="w-12 h-12 rounded-xl" />
+				<span class="text-2xl font-bold text-[#4a7c59]">
 					Plenura
 				</span>
 			</a>

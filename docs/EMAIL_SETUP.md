@@ -36,7 +36,7 @@ Host: smtp.resend.com
 Port: 465
 Username: resend
 Password: [Your RESEND_API_KEY]
-Sender email: noreply@plenura.redbroomsoftware.com
+Sender email: noreply@redbroomsoftware.com
 Sender name: Plenura
 ```
 
@@ -47,8 +47,8 @@ Still in Supabase Dashboard:
 1. Go to **Authentication** > **URL Configuration**
 2. Set **Site URL**: `https://plenura.redbroomsoftware.com`
 3. Add **Redirect URLs**:
-   - `https://plenura.redbroomsoftware.com/auth/callback`
-   - `http://localhost:5174/auth/callback` (for development)
+   - `https://plenura.redbroomsoftware.com/callback`
+   - `http://localhost:5174/callback` (for development)
 
 ### Step 5: Update .env
 
@@ -72,7 +72,7 @@ After configuration:
 1. Try registering a new user
 2. Check the email inbox
 3. Click the confirmation link
-4. User should be redirected to `/auth/callback` and then to dashboard
+4. User should be redirected to `/callback` and then to dashboard
 
 ## Troubleshooting
 

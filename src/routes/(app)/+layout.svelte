@@ -46,10 +46,8 @@
 					<!-- Logo -->
 					<div class="flex items-center">
 						<a href="/" class="flex items-center gap-2">
-							<div class="w-8 h-8 bg-gradient-to-br from-primary-500 to-primary-600 rounded-lg flex items-center justify-center">
-								<span class="text-white text-lg">🌿</span>
-							</div>
-							<span class="text-xl font-bold text-gray-900">Plenura</span>
+							<img src="/logo.svg" alt="Plenura" class="w-9 h-9 rounded-lg" />
+							<span class="text-xl font-bold text-[#4a7c59]">Plenura</span>
 						</a>
 					</div>
 

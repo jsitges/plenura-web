@@ -82,7 +82,7 @@
 						role,
 						referral_code_id: referralCodeId
 					},
-					emailRedirectTo: `${window.location.origin}/auth/callback`
+					emailRedirectTo: `${window.location.origin}/callback`
 				}
 			});
 
@@ -149,7 +149,7 @@
 		const { error: authError } = await supabase.auth.signInWithOAuth({
 			provider: 'google',
 			options: {
-				redirectTo: `${window.location.origin}/auth/callback`,
+				redirectTo: `${window.location.origin}/callback`,
 				queryParams: {
 					access_type: 'offline',
 					prompt: 'consent'
