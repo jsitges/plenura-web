@@ -117,12 +117,14 @@
 										<p class="text-sm font-medium text-gray-900">{data.userProfile?.full_name ?? 'Usuario'}</p>
 										<p class="text-xs text-gray-500">{data.user?.email}</p>
 									</div>
-									<a href="/profile" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-										Mi Perfil
+									{#if data.therapistProfile}
+									<a href="/therapist/profile" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+										Mi Perfil de Terapeuta
 									</a>
-									<a href="/settings" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-										Configuración
-									</a>
+								{/if}
+								<a href="/settings" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+									Configuración
+								</a>
 									<hr class="my-2">
 									<button
 										type="button"

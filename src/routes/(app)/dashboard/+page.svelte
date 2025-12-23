@@ -62,7 +62,7 @@
 	<div class="grid md:grid-cols-2 gap-6">
 		{#if isTherapist}
 			<!-- Therapist Quick Actions -->
-			<a href="/calendar" class="card-wellness flex items-center gap-4 hover:border-primary-200">
+			<a href="/therapist/availability" class="card-wellness flex items-center gap-4 hover:border-primary-200">
 				<div class="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center text-xl">
 					📅
 				</div>
@@ -75,7 +75,7 @@
 				</svg>
 			</a>
 
-			<a href="/services" class="card-wellness flex items-center gap-4 hover:border-primary-200">
+			<a href="/therapist/services" class="card-wellness flex items-center gap-4 hover:border-primary-200">
 				<div class="w-12 h-12 bg-secondary-100 rounded-xl flex items-center justify-center text-xl">
 					💆
 				</div>
@@ -88,7 +88,7 @@
 				</svg>
 			</a>
 
-			<a href="/earnings" class="card-wellness flex items-center gap-4 hover:border-primary-200">
+			<a href="/therapist/earnings" class="card-wellness flex items-center gap-4 hover:border-primary-200">
 				<div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center text-xl">
 					💰
 				</div>
@@ -101,7 +101,7 @@
 				</svg>
 			</a>
 
-			<a href="/profile/edit" class="card-wellness flex items-center gap-4 hover:border-primary-200">
+			<a href="/therapist/profile" class="card-wellness flex items-center gap-4 hover:border-primary-200">
 				<div class="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center text-xl">
 					👤
 				</div>
