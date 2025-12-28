@@ -1,6 +1,13 @@
-import { error, fail, redirect } from '@sveltejs/kit';
+import { error, fail } from '@sveltejs/kit';
+import {
+	approveDocument,
+	rejectDocument,
+	bulkApproveDocuments
+} from '$lib/server/verification.service';
 import type { PageServerLoad, Actions } from './$types';
 import { createTherapistWallet } from '$lib/services/payment.service';
+import { registerTherapistWithEcosystem } from '$lib/server/ecosystem-bridge.service';
+import { createServiceRoleClient } from '$lib/supabase/server';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
 	const { supabase } = locals;
@@ -18,6 +25,11 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			rating_avg,
 			rating_count,
 			vetting_status,
+			verification_status,
+			verification_documents,
+			verification_submitted_at,
+			identity_verified_at,
+			credential_verified_at,
 			is_available,
 			timezone,
 			colectiva_wallet_id,
@@ -60,23 +72,24 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	}
 
 	// Get booking stats
-	const { data: bookingStats } = await supabase
+	const { data: bookingStats } = await (supabase as any)
 		.from('bookings')
 		.select('id, status, price_cents, commission_cents')
 		.eq('therapist_id', params.id);
 
+	type BookingStat = { id: string; status: string; price_cents: number; commission_cents: number };
+	const bookings = (bookingStats ?? []) as BookingStat[];
+
 	const stats = {
-		totalBookings: bookingStats?.length ?? 0,
-		completedBookings: bookingStats?.filter((b) => b.status === 'completed').length ?? 0,
-		cancelledBookings: bookingStats?.filter((b) => b.status === 'cancelled').length ?? 0,
-		totalRevenue:
-			bookingStats
-				?.filter((b) => b.status === 'completed')
-				.reduce((acc, b) => acc + (b.price_cents ?? 0), 0) ?? 0,
-		totalCommission:
-			bookingStats
-				?.filter((b) => b.status === 'completed')
-				.reduce((acc, b) => acc + (b.commission_cents ?? 0), 0) ?? 0
+		totalBookings: bookings.length,
+		completedBookings: bookings.filter((b) => b.status === 'completed').length,
+		cancelledBookings: bookings.filter((b) => b.status === 'cancelled').length,
+		totalRevenue: bookings
+			.filter((b) => b.status === 'completed')
+			.reduce((acc, b) => acc + (b.price_cents ?? 0), 0),
+		totalCommission: bookings
+			.filter((b) => b.status === 'completed')
+			.reduce((acc, b) => acc + (b.commission_cents ?? 0), 0)
 	};
 
 	// Get recent reviews
@@ -126,8 +139,31 @@ export const actions: Actions = {
 		// Create wallet if not exists
 		const walletResult = await createTherapistWallet(params.id, t.users.email, t.users.full_name);
 
+		// Get user's rbsOrgId from auth.users metadata (if they signed up via RBS SSO)
+		const supabaseAdmin = createServiceRoleClient();
+		const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(t.user_id);
+		const rbsOrgId = authUser?.user?.user_metadata?.rbs_org_id as string | null;
+
+		// Register with ecosystem (fire and forget, don't block approval)
+		registerTherapistWithEcosystem(params.id, t.users.full_name, t.users.email, rbsOrgId)
+			.then((result) => {
+				if (result.ecosystemOrgId) {
+					// Update therapist with ecosystem_org_id
+					(supabase as any)
+						.from('therapists')
+						.update({ ecosystem_org_id: result.ecosystemOrgId })
+						.eq('id', params.id)
+						.then(() => {
+							console.log(`[Ecosystem] Updated therapist ${params.id} with ecosystem_org_id`);
+						});
+				}
+			})
+			.catch((err) => {
+				console.error('[Ecosystem] Background registration failed:', err);
+			});
+
 		// Update status to approved
-		const { error: updateError } = await supabase
+		const { error: updateError } = await (supabase as any)
 			.from('therapists')
 			.update({
 				vetting_status: 'approved',
@@ -147,7 +183,7 @@ export const actions: Actions = {
 		const formData = await request.formData();
 		const reason = formData.get('reason') as string;
 
-		const { error: updateError } = await supabase
+		const { error: updateError } = await (supabase as any)
 			.from('therapists')
 			.update({
 				vetting_status: 'rejected',
@@ -165,9 +201,9 @@ export const actions: Actions = {
 	suspend: async ({ params, locals, request }) => {
 		const { supabase } = locals;
 		const formData = await request.formData();
-		const reason = formData.get('reason') as string;
+		const _reason = formData.get('reason') as string;
 
-		const { error: updateError } = await supabase
+		const { error: updateError } = await (supabase as any)
 			.from('therapists')
 			.update({
 				vetting_status: 'suspended',
@@ -185,7 +221,7 @@ export const actions: Actions = {
 	reactivate: async ({ params, locals }) => {
 		const { supabase } = locals;
 
-		const { error: updateError } = await supabase
+		const { error: updateError } = await (supabase as any)
 			.from('therapists')
 			.update({ vetting_status: 'approved' })
 			.eq('id', params.id);
@@ -207,7 +243,7 @@ export const actions: Actions = {
 			? new Date(Date.now() + daysToFeature * 24 * 60 * 60 * 1000).toISOString()
 			: null;
 
-		const { error: updateError } = await supabase
+		const { error: updateError } = await (supabase as any)
 			.from('therapists')
 			.update({
 				is_featured: isFeatured,
@@ -231,7 +267,7 @@ export const actions: Actions = {
 			return fail(400, { error: 'Tier inválido' });
 		}
 
-		const { error: updateError } = await supabase
+		const { error: updateError } = await (supabase as any)
 			.from('therapists')
 			.update({ subscription_tier: tier })
 			.eq('id', params.id);
@@ -241,5 +277,55 @@ export const actions: Actions = {
 		}
 
 		return { success: true, message: `Tier actualizado a ${tier}` };
+	},
+
+	// Verification document actions
+	approveDocument: async ({ params, locals, request }) => {
+		const { supabase } = locals;
+		const formData = await request.formData();
+		const documentType = formData.get('documentType') as string;
+
+		if (!documentType) {
+			return fail(400, { error: 'Tipo de documento requerido' });
+		}
+
+		const result = await approveDocument(supabase, params.id, documentType);
+
+		if (!result.success) {
+			return fail(500, { error: 'Error al aprobar documento' });
+		}
+
+		return { success: true, message: 'Documento aprobado', newStatus: result.newStatus };
+	},
+
+	rejectDocument: async ({ params, locals, request }) => {
+		const { supabase } = locals;
+		const formData = await request.formData();
+		const documentType = formData.get('documentType') as string;
+		const reason = formData.get('reason') as string;
+
+		if (!documentType || !reason) {
+			return fail(400, { error: 'Tipo de documento y razón son requeridos' });
+		}
+
+		const result = await rejectDocument(supabase, params.id, documentType, reason);
+
+		if (!result.success) {
+			return fail(500, { error: 'Error al rechazar documento' });
+		}
+
+		return { success: true, message: 'Documento rechazado', newStatus: result.newStatus };
+	},
+
+	bulkApproveDocuments: async ({ params, locals }) => {
+		const { supabase } = locals;
+
+		const result = await bulkApproveDocuments(supabase, params.id);
+
+		if (!result.success) {
+			return fail(500, { error: 'Error al aprobar documentos' });
+		}
+
+		return { success: true, message: 'Todos los documentos aprobados', newStatus: result.newStatus };
 	}
 };

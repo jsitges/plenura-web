@@ -2,14 +2,17 @@
 	import { createClient } from '$lib/supabase/client';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
-	import { validateReferralCode } from '$lib/services/referral.service';
+	import { validateReferralCode } from '$lib/services/referral.client';
+	import type { PracticeType } from '$lib/types/database.types';
 
 	type UserRole = 'client' | 'therapist';
+	type RegistrationType = 'client' | 'individual' | 'practice';
 
 	// Get referral code from URL if present
 	const urlReferralCode = $page.url.searchParams.get('ref') ?? '';
 
 	let step = $state(1);
+	let registrationType = $state<RegistrationType>('client');
 	let role = $state<UserRole>('client');
 	let email = $state('');
 	let password = $state('');
@@ -25,7 +28,22 @@
 	let showPassword = $state(false);
 	let checkingReferral = $state(false);
 
+	// Practice-specific fields
+	let practiceName = $state('');
+	let practiceType = $state<PracticeType>('solo');
+	let practiceEmail = $state('');
+	let practicePhone = $state('');
+	let practiceAddress = $state('');
+	let practiceCity = $state('');
+	let practiceState = $state('');
+
 	const supabase = createClient();
+
+	function selectRegistrationType(type: RegistrationType) {
+		registrationType = type;
+		role = type === 'client' ? 'client' : 'therapist';
+		step = 2;
+	}
 
 	// Validate referral code on input
 	async function checkReferralCode() {
@@ -70,18 +88,36 @@
 		loading = true;
 
 		try {
-			console.log('[Register] Attempting signup for:', email);
+			console.log('[Register] Attempting signup for:', email, 'type:', registrationType);
+
+			// Build user metadata
+			const userMetadata: Record<string, unknown> = {
+				full_name: fullName,
+				phone,
+				role,
+				referral_code_id: referralCodeId,
+				registration_type: registrationType,
+				is_independent: registrationType !== 'practice'
+			};
+
+			// Add practice info if registering as a practice
+			if (registrationType === 'practice') {
+				userMetadata.pending_practice = {
+					name: practiceName,
+					type: practiceType,
+					email: practiceEmail || email,
+					phone: practicePhone || phone,
+					address: practiceAddress,
+					city: practiceCity,
+					state: practiceState
+				};
+			}
 
 			const { data, error: authError } = await supabase.auth.signUp({
 				email,
 				password,
 				options: {
-					data: {
-						full_name: fullName,
-						phone,
-						role,
-						referral_code_id: referralCodeId
-					},
+					data: userMetadata,
 					emailRedirectTo: `${window.location.origin}/callback`
 				}
 			});
@@ -193,16 +229,16 @@
 	{/if}
 
 	{#if step === 1}
-		<!-- Step 1: Choose role -->
-		<div class="space-y-4">
+		<!-- Step 1: Choose registration type -->
+		<div class="space-y-3">
 			<p class="text-sm text-gray-600 text-center mb-4">
 				¿Cómo quieres usar Plenura?
 			</p>
 
 			<button
 				type="button"
-				onclick={() => { role = 'client'; step = 2; }}
-				class="w-full p-4 border-2 rounded-xl text-left transition-all hover:border-primary-500 hover:bg-primary-50 {role === 'client' ? 'border-primary-500 bg-primary-50' : 'border-gray-200'}"
+				onclick={() => selectRegistrationType('client')}
+				class="w-full p-4 border-2 rounded-xl text-left transition-all hover:border-primary-500 hover:bg-primary-50 border-gray-200"
 			>
 				<div class="flex items-start gap-4">
 					<div class="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center text-2xl">
@@ -219,17 +255,35 @@
 
 			<button
 				type="button"
-				onclick={() => { role = 'therapist'; step = 2; }}
-				class="w-full p-4 border-2 rounded-xl text-left transition-all hover:border-secondary-500 hover:bg-secondary-50 {role === 'therapist' ? 'border-secondary-500 bg-secondary-50' : 'border-gray-200'}"
+				onclick={() => selectRegistrationType('individual')}
+				class="w-full p-4 border-2 rounded-xl text-left transition-all hover:border-secondary-500 hover:bg-secondary-50 border-gray-200"
 			>
 				<div class="flex items-start gap-4">
 					<div class="w-12 h-12 bg-secondary-100 rounded-xl flex items-center justify-center text-2xl">
 						💆
 					</div>
 					<div>
-						<h3 class="font-semibold text-gray-900">Soy terapeuta o profesional</h3>
+						<h3 class="font-semibold text-gray-900">Soy terapeuta independiente</h3>
 						<p class="text-sm text-gray-500 mt-1">
-							Ofrece tus servicios y haz crecer tu negocio
+							Ofrece tus servicios como profesional independiente
+						</p>
+					</div>
+				</div>
+			</button>
+
+			<button
+				type="button"
+				onclick={() => selectRegistrationType('practice')}
+				class="w-full p-4 border-2 rounded-xl text-left transition-all hover:border-accent-500 hover:bg-accent-50 border-gray-200"
+			>
+				<div class="flex items-start gap-4">
+					<div class="w-12 h-12 bg-accent-100 rounded-xl flex items-center justify-center text-2xl">
+						🏢
+					</div>
+					<div>
+						<h3 class="font-semibold text-gray-900">Tengo una clínica o consultorio</h3>
+						<p class="text-sm text-gray-500 mt-1">
+							Registra tu negocio y gestiona tu equipo de terapeutas
 						</p>
 					</div>
 				</div>
@@ -259,9 +313,9 @@
 			<span class="text-gray-700 font-medium">Google</span>
 		</button>
 
-	{:else}
-		<!-- Step 2: Registration form -->
-		<form onsubmit={handleRegister} class="space-y-4">
+	{:else if step === 2}
+		<!-- Step 2: User info -->
+		<form onsubmit={(e) => { e.preventDefault(); registrationType === 'practice' ? step = 3 : handleRegister(e); }} class="space-y-4">
 			<div class="flex items-center gap-2 mb-4">
 				<button
 					type="button"
@@ -274,7 +328,13 @@
 					</svg>
 				</button>
 				<span class="text-sm text-gray-500">
-					Registrándote como {role === 'client' ? 'cliente' : 'terapeuta'}
+					{#if registrationType === 'client'}
+						Registrándote como cliente
+					{:else if registrationType === 'individual'}
+						Registrándote como terapeuta independiente
+					{:else}
+						Paso 1 de 2: Tu información personal
+					{/if}
 				</span>
 			</div>
 
@@ -310,59 +370,62 @@
 
 			<div>
 				<label for="phone" class="block text-sm font-medium text-gray-700 mb-1.5">
-					Teléfono (opcional)
+					Teléfono {registrationType === 'practice' ? '' : '(opcional)'}
 				</label>
 				<input
 					type="tel"
 					id="phone"
 					bind:value={phone}
+					required={registrationType === 'practice'}
 					placeholder="+52 55 1234 5678"
 					class="input-wellness"
 					disabled={loading}
 				/>
 			</div>
 
-			<div>
-				<label for="referralCode" class="block text-sm font-medium text-gray-700 mb-1.5">
-					Código de referido (opcional)
-				</label>
-				<div class="relative">
-					<input
-						type="text"
-						id="referralCode"
-						bind:value={referralCode}
-						onblur={checkReferralCode}
-						placeholder="Ej: ABC12345"
-						class="input-wellness uppercase {referralValid === false ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : referralValid && referralCode ? 'border-green-300 focus:border-green-500 focus:ring-green-500' : ''}"
-						disabled={loading}
-					/>
-					{#if checkingReferral}
-						<div class="absolute right-3 top-1/2 -translate-y-1/2">
-							<svg class="animate-spin h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24">
-								<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-								<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-							</svg>
-						</div>
+			{#if registrationType !== 'practice'}
+				<div>
+					<label for="referralCode" class="block text-sm font-medium text-gray-700 mb-1.5">
+						Código de referido (opcional)
+					</label>
+					<div class="relative">
+						<input
+							type="text"
+							id="referralCode"
+							bind:value={referralCode}
+							onblur={checkReferralCode}
+							placeholder="Ej: ABC12345"
+							class="input-wellness uppercase {referralValid === false ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : referralValid && referralCode ? 'border-green-300 focus:border-green-500 focus:ring-green-500' : ''}"
+							disabled={loading}
+						/>
+						{#if checkingReferral}
+							<div class="absolute right-3 top-1/2 -translate-y-1/2">
+								<svg class="animate-spin h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24">
+									<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+									<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+								</svg>
+							</div>
+						{:else if referralCode && referralValid}
+							<div class="absolute right-3 top-1/2 -translate-y-1/2">
+								<svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+								</svg>
+							</div>
+						{:else if referralCode && referralValid === false}
+							<div class="absolute right-3 top-1/2 -translate-y-1/2">
+								<svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+								</svg>
+							</div>
+						{/if}
+					</div>
+					{#if referralCode && referralValid === false}
+						<p class="text-xs text-red-500 mt-1">Código no válido o expirado</p>
 					{:else if referralCode && referralValid}
-						<div class="absolute right-3 top-1/2 -translate-y-1/2">
-							<svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-							</svg>
-						</div>
-					{:else if referralCode && referralValid === false}
-						<div class="absolute right-3 top-1/2 -translate-y-1/2">
-							<svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-							</svg>
-						</div>
+						<p class="text-xs text-green-600 mt-1">¡Código válido! Recibirás beneficios al registrarte</p>
 					{/if}
 				</div>
-				{#if referralCode && referralValid === false}
-					<p class="text-xs text-red-500 mt-1">Código no válido o expirado</p>
-				{:else if referralCode && referralValid}
-					<p class="text-xs text-green-600 mt-1">¡Código válido! Recibirás beneficios al registrarte</p>
-				{/if}
-			</div>
+			{/if}
 
 			<div>
 				<label for="password" class="block text-sm font-medium text-gray-700 mb-1.5">
@@ -412,6 +475,138 @@
 				/>
 			</div>
 
+			{#if registrationType !== 'practice'}
+				<div class="flex items-start gap-3 pt-2">
+					<input
+						type="checkbox"
+						id="terms"
+						bind:checked={acceptTerms}
+						class="mt-1 h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+					/>
+					<label for="terms" class="text-sm text-gray-600">
+						Acepto los <a href="/terms" class="text-primary-600 hover:underline">términos y condiciones</a>
+						y la <a href="/privacy" class="text-primary-600 hover:underline">política de privacidad</a>
+					</label>
+				</div>
+			{/if}
+
+			<button
+				type="submit"
+				disabled={loading}
+				class="w-full btn-primary-gradient py-3 mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
+			>
+				{#if loading}
+					<span class="inline-flex items-center gap-2">
+						<svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+							<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+						</svg>
+						Creando cuenta...
+					</span>
+				{:else if registrationType === 'practice'}
+					Continuar
+				{:else}
+					Crear cuenta
+				{/if}
+			</button>
+		</form>
+
+	{:else if step === 3}
+		<!-- Step 3: Practice info (only for practice registration) -->
+		<form onsubmit={handleRegister} class="space-y-4">
+			<div class="flex items-center gap-2 mb-4">
+				<button
+					type="button"
+					onclick={() => step = 2}
+					class="text-gray-400 hover:text-gray-600"
+					aria-label="Volver al paso anterior"
+				>
+					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+					</svg>
+				</button>
+				<span class="text-sm text-gray-500">
+					Paso 2 de 2: Información de tu negocio
+				</span>
+			</div>
+
+			<div>
+				<label for="practiceName" class="block text-sm font-medium text-gray-700 mb-1.5">
+					Nombre del negocio
+				</label>
+				<input
+					type="text"
+					id="practiceName"
+					bind:value={practiceName}
+					required
+					placeholder="Ej: Centro de Bienestar Armonía"
+					class="input-wellness"
+					disabled={loading}
+				/>
+			</div>
+
+			<div>
+				<label for="practiceType" class="block text-sm font-medium text-gray-700 mb-1.5">
+					Tipo de negocio
+				</label>
+				<select
+					id="practiceType"
+					bind:value={practiceType}
+					class="input-wellness"
+					disabled={loading}
+				>
+					<option value="solo">Consultorio individual con empleados</option>
+					<option value="group">Práctica grupal (varios terapeutas)</option>
+					<option value="clinic">Clínica o centro de bienestar</option>
+					<option value="franchise">Franquicia o múltiples ubicaciones</option>
+				</select>
+			</div>
+
+			<div class="grid grid-cols-2 gap-3">
+				<div>
+					<label for="practiceCity" class="block text-sm font-medium text-gray-700 mb-1.5">
+						Ciudad
+					</label>
+					<input
+						type="text"
+						id="practiceCity"
+						bind:value={practiceCity}
+						required
+						placeholder="Ej: Ciudad de México"
+						class="input-wellness"
+						disabled={loading}
+					/>
+				</div>
+				<div>
+					<label for="practiceState" class="block text-sm font-medium text-gray-700 mb-1.5">
+						Estado
+					</label>
+					<input
+						type="text"
+						id="practiceState"
+						bind:value={practiceState}
+						required
+						placeholder="Ej: CDMX"
+						class="input-wellness"
+						disabled={loading}
+					/>
+				</div>
+			</div>
+
+			<div>
+				<label for="practiceAddress" class="block text-sm font-medium text-gray-700 mb-1.5">
+					Dirección (opcional)
+				</label>
+				<input
+					type="text"
+					id="practiceAddress"
+					bind:value={practiceAddress}
+					placeholder="Calle, número, colonia"
+					class="input-wellness"
+					disabled={loading}
+				/>
+			</div>
+
 			<div class="flex items-start gap-3 pt-2">
 				<input
 					type="checkbox"
@@ -439,7 +634,7 @@
 						Creando cuenta...
 					</span>
 				{:else}
-					Crear cuenta
+					Crear cuenta y negocio
 				{/if}
 			</button>
 		</form>

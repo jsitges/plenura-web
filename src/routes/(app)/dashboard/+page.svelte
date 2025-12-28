@@ -1,27 +1,74 @@
 <script lang="ts">
-	import { page } from '$app/stores';
-
 	let { data } = $props();
 
 	const user = data.userProfile;
 	const isTherapist = user?.role === 'therapist';
+	const stats = data.stats;
+	const upcomingBookings = data.upcomingBookings ?? [];
 
-	// Quick stats (placeholder data)
-	const clientStats = [
-		{ label: 'Citas completadas', value: 0, icon: '✅' },
-		{ label: 'Próxima cita', value: 'Sin agendar', icon: '📅' },
-		{ label: 'Favoritos', value: 0, icon: '❤️' },
-		{ label: 'Ahorro total', value: '$0', icon: '💰' }
-	];
+	function formatCurrency(cents: number): string {
+		return new Intl.NumberFormat('es-MX', {
+			style: 'currency',
+			currency: 'MXN'
+		}).format(cents / 100);
+	}
 
-	const therapistStats = [
-		{ label: 'Citas hoy', value: 0, icon: '📅' },
-		{ label: 'Esta semana', value: 0, icon: '📊' },
-		{ label: 'Rating', value: '-', icon: '⭐' },
-		{ label: 'Ganancias (mes)', value: '$0', icon: '💰' }
-	];
+	function formatDate(dateStr: string): string {
+		const date = new Date(dateStr);
+		return date.toLocaleDateString('es-MX', {
+			weekday: 'short',
+			day: 'numeric',
+			month: 'short'
+		});
+	}
 
-	const stats = isTherapist ? therapistStats : clientStats;
+	function formatTime(dateStr: string): string {
+		const date = new Date(dateStr);
+		return date.toLocaleTimeString('es-MX', {
+			hour: '2-digit',
+			minute: '2-digit'
+		});
+	}
+
+	function getNextBookingLabel(): string {
+		if (!stats?.nextBooking) return 'Sin agendar';
+		const date = new Date(stats.nextBooking.date);
+		const today = new Date();
+		const tomorrow = new Date(today);
+		tomorrow.setDate(tomorrow.getDate() + 1);
+
+		if (date.toDateString() === today.toDateString()) {
+			return `Hoy, ${formatTime(stats.nextBooking.date)}`;
+		} else if (date.toDateString() === tomorrow.toDateString()) {
+			return `Mañana, ${formatTime(stats.nextBooking.date)}`;
+		}
+		return formatDate(stats.nextBooking.date);
+	}
+
+	// Build stats array based on role
+	const clientStatsDisplay = stats
+		? [
+				{ label: 'Citas completadas', value: stats.completedCount, icon: '✅' },
+				{ label: 'Próxima cita', value: getNextBookingLabel(), icon: '📅' },
+				{ label: 'Favoritos', value: stats.favoritesCount, icon: '❤️' },
+				{ label: 'Ahorro total', value: formatCurrency(stats.totalSavings), icon: '💰' }
+			]
+		: [];
+
+	const therapistStatsDisplay = stats
+		? [
+				{ label: 'Citas hoy', value: stats.todayCount, icon: '📅' },
+				{ label: 'Esta semana', value: stats.weekCount, icon: '📊' },
+				{
+					label: 'Rating',
+					value: stats.rating > 0 ? `${stats.rating.toFixed(1)} (${stats.ratingCount})` : '-',
+					icon: '⭐'
+				},
+				{ label: 'Ganancias (mes)', value: formatCurrency(stats.monthlyEarnings), icon: '💰' }
+			]
+		: [];
+
+	const displayStats = isTherapist ? therapistStatsDisplay : clientStatsDisplay;
 </script>
 
 <svelte:head>
@@ -45,7 +92,7 @@
 
 	<!-- Quick Stats -->
 	<div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-		{#each stats as stat}
+		{#each displayStats as stat}
 			<div class="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
 				<div class="flex items-center gap-3">
 					<span class="text-2xl">{stat.icon}</span>
@@ -172,25 +219,71 @@
 
 	<!-- Upcoming Bookings Section -->
 	<div class="bg-white rounded-2xl border border-gray-100 shadow-sm">
-		<div class="p-6 border-b border-gray-100">
+		<div class="p-6 border-b border-gray-100 flex items-center justify-between">
 			<h2 class="text-lg font-semibold text-gray-900">
 				{isTherapist ? 'Próximas Citas' : 'Tus Próximas Sesiones'}
 			</h2>
+			<a href={isTherapist ? '/therapist/bookings' : '/bookings'} class="text-sm text-primary-600 hover:text-primary-700">
+				Ver todas
+			</a>
 		</div>
 		<div class="p-6">
-			<div class="text-center py-8">
-				<div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-					<svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-					</svg>
+			{#if upcomingBookings.length > 0}
+				<div class="space-y-4">
+					{#each upcomingBookings as booking}
+						<a href={isTherapist ? `/therapist/bookings` : `/bookings`} class="flex items-center gap-4 p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
+							{#if isTherapist}
+								{#if booking.clientAvatar}
+									<img src={booking.clientAvatar} alt="" class="w-12 h-12 rounded-full object-cover" />
+								{:else}
+									<div class="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
+										<span class="text-primary-600 font-medium">{booking.clientName?.charAt(0) || 'C'}</span>
+									</div>
+								{/if}
+								<div class="flex-1 min-w-0">
+									<p class="font-medium text-gray-900 truncate">{booking.clientName}</p>
+									<p class="text-sm text-gray-500 truncate">{booking.serviceName}</p>
+								</div>
+							{:else}
+								{#if booking.therapistAvatar}
+									<img src={booking.therapistAvatar} alt="" class="w-12 h-12 rounded-full object-cover" />
+								{:else}
+									<div class="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
+										<span class="text-primary-600 font-medium">{booking.therapistName?.charAt(0) || 'T'}</span>
+									</div>
+								{/if}
+								<div class="flex-1 min-w-0">
+									<p class="font-medium text-gray-900 truncate">{booking.therapistName}</p>
+									<p class="text-sm text-gray-500 truncate">{booking.serviceName}</p>
+								</div>
+							{/if}
+							<div class="text-right">
+								<p class="text-sm font-medium text-gray-900">{formatDate(booking.scheduledAt)}</p>
+								<p class="text-sm text-gray-500">{formatTime(booking.scheduledAt)}</p>
+							</div>
+							<div>
+								<span class="px-2 py-1 text-xs rounded-full {booking.status === 'confirmed' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}">
+									{booking.status === 'confirmed' ? 'Confirmada' : 'Pendiente'}
+								</span>
+							</div>
+						</a>
+					{/each}
 				</div>
-				<p class="text-gray-500 mb-4">No tienes citas programadas</p>
-				{#if !isTherapist}
-					<a href="/therapists" class="btn-primary-gradient inline-block">
-						Buscar Terapeuta
-					</a>
-				{/if}
-			</div>
+			{:else}
+				<div class="text-center py-8">
+					<div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+						<svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+						</svg>
+					</div>
+					<p class="text-gray-500 mb-4">No tienes citas programadas</p>
+					{#if !isTherapist}
+						<a href="/therapists" class="btn-primary-gradient inline-block">
+							Buscar Terapeuta
+						</a>
+					{/if}
+				</div>
+			{/if}
 		</div>
 	</div>
 </div>

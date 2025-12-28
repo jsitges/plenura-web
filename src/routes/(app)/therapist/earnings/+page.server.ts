@@ -26,14 +26,39 @@ export const load: PageServerLoad = async ({ locals }) => {
 		colectiva_wallet_id: string | null;
 	};
 
-	const [summary, recentEarnings] = await Promise.all([
+	// Fetch earnings summary, recent earnings, and payout history
+	const [summary, recentEarnings, payoutsResult] = await Promise.all([
 		getEarningsSummary(supabase, t.id),
-		getBookingEarnings(supabase, t.id, 10)
+		getBookingEarnings(supabase, t.id, 10),
+		(supabase as any)
+			.from('payouts')
+			.select('*')
+			.eq('therapist_id', t.id)
+			.order('processed_at', { ascending: false })
+			.limit(10)
 	]);
+
+	// Map payouts to a cleaner format
+	const payouts = (payoutsResult.data ?? []).map((p: any) => ({
+		id: p.id,
+		amountCents: p.amount_cents,
+		status: p.status,
+		payoutMethod: p.payout_method,
+		bankAccountLastFour: p.bank_account_last_four,
+		processedAt: p.processed_at,
+		notes: p.notes
+	}));
+
+	// Calculate total payouts
+	const totalPayoutsCents = payouts
+		.filter((p: any) => p.status === 'completed')
+		.reduce((sum: number, p: any) => sum + p.amountCents, 0);
 
 	return {
 		summary,
 		recentEarnings,
+		payouts,
+		totalPayoutsCents,
 		subscriptionTier: t.subscription_tier,
 		hasWallet: !!t.colectiva_wallet_id
 	};

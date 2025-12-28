@@ -5,7 +5,10 @@ import {
 	calculateRefundAmount,
 	createEscrow,
 	releaseEscrow,
-	refundEscrow
+	releaseEscrowToWallet,
+	releaseEscrowSplit,
+	refundEscrow,
+	type SplitRecipient
 } from './payment.service';
 import {
 	sendBookingConfirmationToClient,
@@ -46,6 +49,10 @@ export interface CreateBookingInput {
 	scheduledAt: string;
 	clientAddress: string;
 	clientNotes?: string;
+	// Practice booking fields (optional)
+	practiceId?: string;
+	assignedBy?: string;  // User ID who assigned (for practice_assigns mode)
+	assignmentNotes?: string;
 }
 
 export interface BookingWithDetails {
@@ -93,18 +100,56 @@ export async function createBooking(
 
 	const svc = serviceData as { duration_minutes: number; price_cents: number };
 
-	// Get therapist subscription tier for commission calculation
+	// Get therapist details including practice membership
 	const { data: therapist } = await supabase
 		.from('therapists')
-		.select('subscription_tier')
+		.select('id, subscription_tier, primary_practice_id, is_independent')
 		.eq('id', input.therapistId)
 		.single();
 
-	const subscriptionTier = (therapist as { subscription_tier: string } | null)?.subscription_tier ?? 'free';
+	const therapistData = therapist as {
+		id: string;
+		subscription_tier: string;
+		primary_practice_id: string | null;
+		is_independent: boolean;
+	} | null;
 
-	// Calculate commission and payout
-	const commissionCents = calculateCommission(svc.price_cents, subscriptionTier);
-	const payoutCents = svc.price_cents - commissionCents;
+	const subscriptionTier = therapistData?.subscription_tier ?? 'free';
+
+	// Calculate Plenura commission based on subscription tier
+	const plenuraCommissionCents = calculateCommission(svc.price_cents, subscriptionTier);
+
+	// Calculate practice commission if applicable
+	let practiceCommissionCents = 0;
+	let payoutRouting: 'therapist_wallet' | 'practice_wallet' | 'split' = 'therapist_wallet';
+	const practiceId = input.practiceId || therapistData?.primary_practice_id;
+
+	if (practiceId && !therapistData?.is_independent) {
+		// Get practice settings and member-specific overrides
+		const { data: practiceData } = await (supabase as any)
+			.from('practices')
+			.select('default_commission_rate, payout_routing')
+			.eq('id', practiceId)
+			.single();
+
+		const { data: memberData } = await (supabase as any)
+			.from('practice_members')
+			.select('commission_rate, payout_routing')
+			.eq('therapist_id', input.therapistId)
+			.eq('practice_id', practiceId)
+			.eq('status', 'active')
+			.single();
+
+		// Use member-specific rate if set, otherwise practice default
+		const practiceCommissionRate = memberData?.commission_rate ?? practiceData?.default_commission_rate ?? 0;
+		practiceCommissionCents = Math.round((svc.price_cents - plenuraCommissionCents) * practiceCommissionRate / 100);
+
+		// Determine payout routing
+		payoutRouting = memberData?.payout_routing ?? practiceData?.payout_routing ?? 'therapist_wallet';
+	}
+
+	// Calculate final therapist payout
+	const therapistPayoutCents = svc.price_cents - plenuraCommissionCents - practiceCommissionCents;
 
 	// Calculate end time
 	const startTime = new Date(input.scheduledAt);
@@ -123,20 +168,28 @@ export async function createBooking(
 	}
 
 	// Create the booking with commission details
-	const { data, error } = await supabase
+	const bookingData: Record<string, unknown> = {
+		therapist_id: input.therapistId,
+		therapist_service_id: input.therapistServiceId,
+		scheduled_at: input.scheduledAt,
+		scheduled_end_at: endTime.toISOString(),
+		client_address: input.clientAddress,
+		notes: input.clientNotes,
+		price_cents: svc.price_cents,
+		commission_cents: plenuraCommissionCents,
+		therapist_payout_cents: therapistPayoutCents,
+		status: 'pending',
+		// Practice-related fields
+		practice_id: practiceId || null,
+		practice_commission_cents: practiceCommissionCents,
+		payout_routing: payoutRouting,
+		assigned_by: input.assignedBy || null,
+		assignment_notes: input.assignmentNotes || null
+	};
+
+	const { data, error } = await (supabase as any)
 		.from('bookings')
-		.insert({
-			therapist_id: input.therapistId,
-			therapist_service_id: input.therapistServiceId,
-			scheduled_at: input.scheduledAt,
-			scheduled_end_at: endTime.toISOString(),
-			client_address: input.clientAddress,
-			notes: input.clientNotes,
-			price_cents: svc.price_cents,
-			commission_cents: commissionCents,
-			therapist_payout_cents: payoutCents,
-			status: 'pending'
-		})
+		.insert(bookingData)
 		.select()
 		.single();
 
@@ -361,21 +414,22 @@ export async function initiateBookingPayment(
 }
 
 /**
- * Complete a booking and release funds to therapist
+ * Complete a booking and release funds to therapist (and practice if applicable)
  */
 export async function completeBooking(
 	supabase: SupabaseClient<Database>,
 	bookingId: string,
 	completedBy: 'client' | 'therapist'
 ): Promise<{ success: boolean; error?: string }> {
-	// Get booking with escrow info and client email preferences
-	const { data: booking, error: fetchError } = await supabase
+	// Get booking with escrow info, practice details, and client email preferences
+	const { data: booking, error: fetchError } = await (supabase as any)
 		.from('bookings')
 		.select(`
 			*,
-			therapists!inner(subscription_tier, users!inner(full_name)),
+			therapists!inner(subscription_tier, colectiva_wallet_id, users!inner(full_name)),
 			users:client_id(full_name, email, phone, email_preferences),
-			therapist_services!inner(services!inner(name))
+			therapist_services!inner(services!inner(name)),
+			practices(id, name, colectiva_wallet_id)
 		`)
 		.eq('id', bookingId)
 		.single();
@@ -384,16 +438,21 @@ export async function completeBooking(
 		return { success: false, error: 'Reserva no encontrada' };
 	}
 
-	const b = booking as unknown as {
+	const b = booking as {
 		id: string;
 		status: string;
 		escrow_id: string | null;
 		price_cents: number;
 		commission_cents: number;
+		practice_commission_cents: number;
+		therapist_payout_cents: number;
+		payout_routing: 'therapist_wallet' | 'practice_wallet' | 'split' | null;
+		practice_id: string | null;
 		scheduled_at: string;
 		client_address: string;
 		therapists: {
 			subscription_tier: string;
+			colectiva_wallet_id: string | null;
 			users: { full_name: string };
 		};
 		users: {
@@ -403,6 +462,7 @@ export async function completeBooking(
 			email_preferences: EmailPreferences | null;
 		};
 		therapist_services: { services: { name: string } };
+		practices: { id: string; name: string; colectiva_wallet_id: string | null } | null;
 	};
 
 	if (b.status !== 'confirmed') {
@@ -410,25 +470,61 @@ export async function completeBooking(
 	}
 
 	// Update booking status
-	const { error: updateError } = await supabase
+	const { error: updateError } = await (supabase as any)
 		.from('bookings')
 		.update({
 			status: 'completed',
 			completed_at: new Date().toISOString(),
 			completed_by: completedBy
-		} as never)
+		})
 		.eq('id', bookingId);
 
 	if (updateError) {
 		return { success: false, error: 'Error al actualizar reserva' };
 	}
 
-	// Release escrow if exists
+	// Release escrow if exists - handle different payout routing scenarios
 	if (b.escrow_id) {
-		const releaseResult = await releaseEscrow(b.escrow_id, b.commission_cents);
-		if (!releaseResult.success) {
-			console.error('Error releasing escrow:', releaseResult.error);
-			// Don't fail the completion, payment will be retried via webhook
+		// Total platform fee (Plenura commission)
+		const platformFeeCents = b.commission_cents;
+
+		// Determine payout destinations based on routing
+		const payoutRouting = b.payout_routing || 'therapist_wallet';
+
+		if (payoutRouting === 'practice_wallet' && b.practices?.colectiva_wallet_id) {
+			// All funds go to practice wallet (practice handles internal payouts)
+			const releaseResult = await releaseEscrowToWallet(
+				b.escrow_id,
+				b.practices.colectiva_wallet_id,
+				platformFeeCents
+			);
+			if (!releaseResult.success) {
+				console.error('Error releasing escrow to practice:', releaseResult.error);
+			}
+		} else if (payoutRouting === 'split' && b.practices?.colectiva_wallet_id && b.therapists?.colectiva_wallet_id) {
+			// Split between practice and therapist
+			const practiceCommission = b.practice_commission_cents || 0;
+			const therapistAmount = b.price_cents - platformFeeCents - practiceCommission;
+
+			const recipients: SplitRecipient[] = [
+				{ walletId: b.therapists.colectiva_wallet_id, amountCents: therapistAmount },
+				{ walletId: b.practices.colectiva_wallet_id, amountCents: practiceCommission }
+			];
+
+			const releaseResult = await releaseEscrowSplit(
+				b.escrow_id,
+				recipients,
+				platformFeeCents
+			);
+			if (!releaseResult.success) {
+				console.error('Error releasing split escrow:', releaseResult.error);
+			}
+		} else {
+			// Default: all goes to therapist wallet
+			const releaseResult = await releaseEscrow(b.escrow_id, platformFeeCents);
+			if (!releaseResult.success) {
+				console.error('Error releasing escrow:', releaseResult.error);
+			}
 		}
 	}
 

@@ -4,14 +4,18 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const { supabase } = locals;
 
 	// Get counts
-	const [usersResult, therapistsResult, bookingsResult, pendingResult] = await Promise.all([
+	const [usersResult, therapistsResult, bookingsResult, pendingResult, openDisputesResult] = await Promise.all([
 		supabase.from('users').select('id', { count: 'exact', head: true }),
 		supabase.from('therapists').select('id', { count: 'exact', head: true }),
 		supabase.from('bookings').select('id', { count: 'exact', head: true }),
 		supabase
 			.from('therapists')
 			.select('id', { count: 'exact', head: true })
-			.eq('vetting_status', 'pending')
+			.eq('vetting_status', 'pending'),
+		(supabase as any)
+			.from('admin_disputes')
+			.select('id', { count: 'exact', head: true })
+			.in('status', ['open', 'investigating'])
 	]);
 
 	// Get recent bookings
@@ -73,6 +77,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			totalTherapists: therapistsResult.count ?? 0,
 			totalBookings: bookingsResult.count ?? 0,
 			pendingApprovals: pendingResult.count ?? 0,
+			openDisputes: openDisputesResult.count ?? 0,
 			monthlyRevenue,
 			monthlyGMV
 		},

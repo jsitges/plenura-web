@@ -24,7 +24,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			reward_paid_cents,
 			users:referred_user_id (full_name)
 		`)
-		.eq('referrer_code_id', referralCode?.id ?? '')
+		.eq('referral_code_id', referralCode?.id ?? '')
 		.order('created_at', { ascending: false })
 		.limit(10);
 

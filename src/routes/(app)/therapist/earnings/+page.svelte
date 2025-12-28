@@ -1,7 +1,7 @@
 <script lang="ts">
 	let { data } = $props();
 
-	const { summary, recentEarnings, subscriptionTier } = data;
+	const { summary, recentEarnings, payouts, totalPayoutsCents, subscriptionTier } = data;
 
 	// Commission rates by tier
 	const commissionRates: Record<string, number> = {
@@ -220,6 +220,63 @@
 				</div>
 				<h3 class="text-lg font-medium text-gray-900 mb-2">Sin ganancias aún</h3>
 				<p class="text-gray-500">Completa servicios para ver tus ganancias aquí</p>
+			</div>
+		{/if}
+	</div>
+
+	<!-- Payout History -->
+	<div class="bg-white rounded-xl border border-gray-100">
+		<div class="p-6 border-b border-gray-100 flex items-center justify-between">
+			<div>
+				<h2 class="text-lg font-semibold text-gray-900">Retiros a tu Banco</h2>
+				<p class="text-sm text-gray-500 mt-0.5">Total retirado: {formatPrice(totalPayoutsCents)}</p>
+			</div>
+		</div>
+
+		{#if payouts.length > 0}
+			<div class="divide-y divide-gray-100">
+				{#each payouts as payout}
+					<div class="p-4 sm:p-6 flex items-center justify-between gap-4">
+						<div class="flex items-center gap-4">
+							<div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+								<svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+								</svg>
+							</div>
+							<div>
+								<p class="font-medium text-gray-900">
+									Transferencia bancaria
+									{#if payout.bankAccountLastFour}
+										<span class="text-gray-500">****{payout.bankAccountLastFour}</span>
+									{/if}
+								</p>
+								<p class="text-sm text-gray-600">
+									{formatDate(payout.processedAt)}
+									{#if payout.payoutMethod}
+										<span class="text-gray-400 mx-1">·</span>
+										<span class="capitalize">{payout.payoutMethod.replace('_', ' ')}</span>
+									{/if}
+								</p>
+							</div>
+						</div>
+						<div class="text-right">
+							<p class="font-semibold text-green-600">+{formatPrice(payout.amountCents)}</p>
+							<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium {payout.status === 'completed' ? 'bg-green-100 text-green-700' : payout.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'}">
+								{payout.status === 'completed' ? 'Completado' : payout.status === 'pending' ? 'Pendiente' : payout.status === 'processing' ? 'Procesando' : 'Fallido'}
+							</span>
+						</div>
+					</div>
+				{/each}
+			</div>
+		{:else}
+			<div class="p-12 text-center">
+				<div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+					<svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+					</svg>
+				</div>
+				<h3 class="text-lg font-medium text-gray-900 mb-2">Sin retiros aún</h3>
+				<p class="text-gray-500">Tus retiros aparecerán aquí cuando recibas pagos</p>
 			</div>
 		{/if}
 	</div>

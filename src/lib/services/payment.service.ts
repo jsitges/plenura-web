@@ -190,6 +190,104 @@ export async function releaseEscrow(
 	}
 }
 
+export interface SplitRecipient {
+	walletId: string;
+	amountCents: number;
+}
+
+/**
+ * Release escrow funds to a specific wallet (e.g., practice wallet)
+ * Used when the practice handles all payouts internally
+ */
+export async function releaseEscrowToWallet(
+	escrowId: string,
+	targetWalletId: string,
+	commissionCents: number
+): Promise<EscrowResult> {
+	const { apiUrl, apiKey } = await getEnvVars();
+
+	if (!apiUrl || !apiKey) {
+		console.warn('Colectiva API not configured, using mock mode');
+		return mockReleaseEscrow(escrowId);
+	}
+
+	try {
+		const response = await fetch(`${apiUrl}/escrows/${escrowId}/release`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'Authorization': `Bearer ${apiKey}`
+			},
+			body: JSON.stringify({
+				target_wallet_id: targetWalletId,
+				platform_fee_cents: commissionCents
+			})
+		});
+
+		if (!response.ok) {
+			const error = await response.json();
+			return { success: false, error: error.message ?? 'Error releasing escrow to wallet' };
+		}
+
+		const data = await response.json();
+		return {
+			success: true,
+			escrowId: data.id
+		};
+	} catch (error) {
+		console.error('Error releasing escrow to wallet:', error);
+		return { success: false, error: 'Error connecting to payment provider' };
+	}
+}
+
+/**
+ * Release escrow with split payment to multiple recipients
+ * Used for practice/therapist splits where both parties receive funds
+ */
+export async function releaseEscrowSplit(
+	escrowId: string,
+	recipients: SplitRecipient[],
+	commissionCents: number
+): Promise<EscrowResult> {
+	const { apiUrl, apiKey } = await getEnvVars();
+
+	if (!apiUrl || !apiKey) {
+		console.warn('Colectiva API not configured, using mock mode');
+		return mockReleaseEscrow(escrowId);
+	}
+
+	try {
+		const response = await fetch(`${apiUrl}/escrows/${escrowId}/release-split`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'Authorization': `Bearer ${apiKey}`
+			},
+			body: JSON.stringify({
+				recipients: recipients.map((r) => ({
+					wallet_id: r.walletId,
+					amount_cents: r.amountCents
+				})),
+				platform_fee_cents: commissionCents
+			})
+		});
+
+		if (!response.ok) {
+			const error = await response.json();
+			return { success: false, error: error.message ?? 'Error releasing split escrow' };
+		}
+
+		const data = await response.json();
+		return {
+			success: true,
+			escrowId: data.id
+		};
+	} catch (error) {
+		console.error('Error releasing split escrow:', error);
+		return { success: false, error: 'Error connecting to payment provider' };
+	}
+}
+
 /**
  * Refund escrow to client
  * Called when a booking is cancelled
@@ -312,6 +410,116 @@ export async function getWalletBalance(walletId: string): Promise<{ balanceCents
 	}
 }
 
+export interface WalletCreditResult {
+	success: boolean;
+	transactionId?: string;
+	error?: string;
+}
+
+/**
+ * Credit funds to a user's wallet
+ * Used for referral rewards, promotional credits, etc.
+ */
+export async function creditWallet(
+	userId: string,
+	amountCents: number,
+	reason: string,
+	metadata?: Record<string, unknown>
+): Promise<WalletCreditResult> {
+	const { apiUrl, apiKey } = await getEnvVars();
+
+	if (!apiUrl || !apiKey) {
+		console.warn('Colectiva API not configured, using mock mode');
+		return mockCreditWallet(userId, amountCents);
+	}
+
+	try {
+		// First, find or create wallet for user
+		const response = await fetch(`${apiUrl}/wallets/credit`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'Authorization': `Bearer ${apiKey}`
+			},
+			body: JSON.stringify({
+				user_id: userId,
+				amount_cents: amountCents,
+				currency: 'MXN',
+				reason,
+				metadata: {
+					...metadata,
+					platform: 'plenura'
+				}
+			})
+		});
+
+		if (!response.ok) {
+			const error = await response.json();
+			return { success: false, error: error.message ?? 'Error crediting wallet' };
+		}
+
+		const data = await response.json();
+		return {
+			success: true,
+			transactionId: data.transaction_id
+		};
+	} catch (error) {
+		console.error('Error crediting wallet:', error);
+		return { success: false, error: 'Error connecting to payment provider' };
+	}
+}
+
+/**
+ * Get or create a wallet for a user (client or therapist)
+ * Clients can have wallets for referral credits and promotional balances
+ */
+export async function getOrCreateUserWallet(
+	userId: string,
+	email: string,
+	fullName: string,
+	userType: 'client' | 'therapist' = 'client'
+): Promise<WalletResult> {
+	const { apiUrl, apiKey } = await getEnvVars();
+
+	if (!apiUrl || !apiKey) {
+		console.warn('Colectiva API not configured, using mock mode');
+		return mockCreateWallet(`${userType}_${userId}`);
+	}
+
+	try {
+		const response = await fetch(`${apiUrl}/wallets/get-or-create`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'Authorization': `Bearer ${apiKey}`
+			},
+			body: JSON.stringify({
+				external_id: userId,
+				email,
+				name: fullName,
+				type: userType,
+				metadata: {
+					platform: 'plenura'
+				}
+			})
+		});
+
+		if (!response.ok) {
+			const error = await response.json();
+			return { success: false, error: error.message ?? 'Error getting/creating wallet' };
+		}
+
+		const data = await response.json();
+		return {
+			success: true,
+			walletId: data.id
+		};
+	} catch (error) {
+		console.error('Error getting/creating wallet:', error);
+		return { success: false, error: 'Error connecting to payment provider' };
+	}
+}
+
 // Mock functions for development without Colectiva credentials
 function mockCreateEscrow(input: EscrowCreateInput): EscrowResult {
 	return {
@@ -340,5 +548,13 @@ function mockCreateWallet(therapistId: string): WalletResult {
 	return {
 		success: true,
 		walletId: `mock_wallet_${therapistId}`
+	};
+}
+
+function mockCreditWallet(userId: string, amountCents: number): WalletCreditResult {
+	console.log(`[MOCK] Credited ${amountCents} cents to user ${userId}`);
+	return {
+		success: true,
+		transactionId: `mock_credit_${Date.now()}`
 	};
 }

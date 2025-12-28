@@ -187,7 +187,7 @@ export async function completeReferral(
 
 	const typedReferral = referral as { id: string; referral_code_id: string };
 
-	// Get reward amount from code
+	// Get reward amount from code and referrer details
 	const { data: code } = await supabase
 		.from('referral_codes')
 		.select('user_id, reward_amount_cents')
@@ -199,6 +199,31 @@ export async function completeReferral(
 	}
 
 	const typedCode = code as { user_id: string; reward_amount_cents: number };
+
+	// Credit the referrer's wallet with reward amount
+	// Use dynamic import since this function is only called server-side
+	// and the payment service has server-only imports
+	try {
+		const { creditWallet } = await import('./payment.service');
+		const creditResult = await creditWallet(
+			typedCode.user_id,
+			typedCode.reward_amount_cents,
+			'Referral reward',
+			{
+				referral_id: typedReferral.id,
+				referred_user_id: referredUserId,
+				type: 'referral_bonus'
+			}
+		);
+
+		if (!creditResult.success) {
+			console.error('Failed to credit referral reward:', creditResult.error);
+			// Continue with marking as completed but log the failure
+			// The reward can be manually credited later if needed
+		}
+	} catch (err) {
+		console.error('Error importing payment service:', err);
+	}
 
 	// Mark referral as completed
 	const { error } = await supabase
@@ -214,9 +239,6 @@ export async function completeReferral(
 		console.error('Error completing referral:', error);
 		return false;
 	}
-
-	// TODO: Credit the referrer's wallet with reward amount
-	// This would integrate with Colectiva payment system
 
 	return true;
 }

@@ -3,6 +3,15 @@
 
 	let { data } = $props();
 
+	interface VerificationDocument {
+		type: 'government_id' | 'selfie' | 'professional_license' | 'degree_certificate';
+		url: string;
+		uploadedAt: string;
+		status: 'pending' | 'approved' | 'rejected';
+		reviewedAt?: string;
+		rejectionReason?: string;
+	}
+
 	const t = data.therapist as unknown as {
 		id: string;
 		bio: string | null;
@@ -12,6 +21,11 @@
 		rating_avg: number;
 		rating_count: number;
 		vetting_status: string;
+		verification_status: string | null;
+		verification_documents: VerificationDocument[] | null;
+		verification_submitted_at: string | null;
+		identity_verified_at: string | null;
+		credential_verified_at: string | null;
 		is_available: boolean;
 		timezone: string;
 		colectiva_wallet_id: string | null;
@@ -42,6 +56,49 @@
 			};
 		}>;
 	};
+
+	const verificationDocs = (t.verification_documents ?? []) as VerificationDocument[];
+	const pendingDocs = verificationDocs.filter(d => d.status === 'pending');
+	const hasPendingDocs = pendingDocs.length > 0;
+
+	const verificationStatusColors: Record<string, string> = {
+		unverified: 'bg-gray-100 text-gray-800',
+		pending: 'bg-amber-100 text-amber-800',
+		identity_verified: 'bg-blue-100 text-blue-800',
+		credential_verified: 'bg-purple-100 text-purple-800',
+		fully_verified: 'bg-green-100 text-green-800'
+	};
+
+	const verificationStatusLabels: Record<string, string> = {
+		unverified: 'Sin verificar',
+		pending: 'Pendiente',
+		identity_verified: 'Identidad verificada',
+		credential_verified: 'Credenciales verificadas',
+		fully_verified: 'Completamente verificado'
+	};
+
+	const docTypeLabels: Record<string, string> = {
+		government_id: 'Identificación oficial',
+		selfie: 'Selfie con identificación',
+		professional_license: 'Cédula profesional',
+		degree_certificate: 'Título o certificado'
+	};
+
+	const docStatusColors: Record<string, string> = {
+		pending: 'bg-amber-100 text-amber-800',
+		approved: 'bg-green-100 text-green-800',
+		rejected: 'bg-red-100 text-red-800'
+	};
+
+	const docStatusLabels: Record<string, string> = {
+		pending: 'Pendiente',
+		approved: 'Aprobado',
+		rejected: 'Rechazado'
+	};
+
+	let showDocRejectModal = $state(false);
+	let selectedDocType = $state('');
+	let docRejectionReason = $state('');
 
 	const reviews = data.reviews as Array<{
 		id: string;
@@ -187,6 +244,105 @@
 			</button>
 		</div>
 	</div>
+
+	<!-- Verification Documents Section -->
+	{#if verificationDocs.length > 0 || t.verification_status}
+		<div class="bg-white rounded-xl shadow-sm p-6">
+			<div class="flex items-center justify-between mb-4">
+				<div class="flex items-center gap-3">
+					<h2 class="font-semibold text-gray-900">Verificación de Documentos</h2>
+					<span class="px-2 py-1 text-xs rounded-full {verificationStatusColors[t.verification_status ?? 'unverified']}">
+						{verificationStatusLabels[t.verification_status ?? 'unverified']}
+					</span>
+				</div>
+				{#if hasPendingDocs}
+					<form method="POST" action="?/bulkApproveDocuments" use:enhance>
+						<button type="submit" class="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700">
+							Aprobar Todos ({pendingDocs.length})
+						</button>
+					</form>
+				{/if}
+			</div>
+
+			{#if t.verification_submitted_at}
+				<p class="text-sm text-gray-500 mb-4">
+					Documentos enviados: {formatDateTime(t.verification_submitted_at)}
+				</p>
+			{/if}
+
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+				{#each verificationDocs as doc}
+					<div class="border rounded-lg p-4 {doc.status === 'pending' ? 'border-amber-300 bg-amber-50' : doc.status === 'approved' ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}">
+						<div class="flex items-start justify-between mb-3">
+							<div>
+								<p class="font-medium text-gray-900">{docTypeLabels[doc.type] ?? doc.type}</p>
+								<span class="px-2 py-0.5 text-xs rounded {docStatusColors[doc.status]}">
+									{docStatusLabels[doc.status]}
+								</span>
+							</div>
+							<p class="text-xs text-gray-500">{formatDateTime(doc.uploadedAt)}</p>
+						</div>
+
+						{#if doc.url}
+							<a
+								href={doc.url}
+								target="_blank"
+								rel="noopener noreferrer"
+								class="block mb-3 text-primary-600 hover:underline text-sm"
+							>
+								Ver documento →
+							</a>
+						{/if}
+
+						{#if doc.rejectionReason}
+							<p class="text-sm text-red-600 mb-3">
+								<span class="font-medium">Razón de rechazo:</span> {doc.rejectionReason}
+							</p>
+						{/if}
+
+						{#if doc.status === 'pending'}
+							<div class="flex gap-2">
+								<form method="POST" action="?/approveDocument" use:enhance class="flex-1">
+									<input type="hidden" name="documentType" value={doc.type} />
+									<button type="submit" class="w-full px-3 py-1.5 bg-green-600 text-white text-sm rounded hover:bg-green-700">
+										Aprobar
+									</button>
+								</form>
+								<button
+									type="button"
+									onclick={() => { selectedDocType = doc.type; showDocRejectModal = true; }}
+									class="flex-1 px-3 py-1.5 bg-red-600 text-white text-sm rounded hover:bg-red-700"
+								>
+									Rechazar
+								</button>
+							</div>
+						{/if}
+					</div>
+				{:else}
+					<div class="col-span-2 text-center py-8 text-gray-500">
+						No hay documentos de verificación
+					</div>
+				{/each}
+			</div>
+
+			{#if t.identity_verified_at || t.credential_verified_at}
+				<div class="mt-4 pt-4 border-t grid grid-cols-2 gap-4 text-sm">
+					{#if t.identity_verified_at}
+						<div>
+							<span class="text-gray-500">Identidad verificada:</span>
+							<span class="font-medium text-green-600 ml-1">{formatDate(t.identity_verified_at)}</span>
+						</div>
+					{/if}
+					{#if t.credential_verified_at}
+						<div>
+							<span class="text-gray-500">Credenciales verificadas:</span>
+							<span class="font-medium text-green-600 ml-1">{formatDate(t.credential_verified_at)}</span>
+						</div>
+					{/if}
+				</div>
+			{/if}
+		</div>
+	{/if}
 
 	<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 		<!-- Main Info -->
@@ -484,6 +640,44 @@
 					</button>
 					<button type="submit" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
 						Guardar
+					</button>
+				</div>
+			</form>
+		</div>
+	</div>
+{/if}
+
+<!-- Document Reject Modal -->
+{#if showDocRejectModal}
+	<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+		<div class="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+			<h3 class="text-lg font-semibold mb-4">Rechazar Documento</h3>
+			<form method="POST" action="?/rejectDocument" use:enhance>
+				<input type="hidden" name="documentType" value={selectedDocType} />
+				<div class="mb-4">
+					<label for="doc-reason" class="block text-sm font-medium text-gray-700 mb-1">
+						Razón del rechazo
+					</label>
+					<textarea
+						id="doc-reason"
+						name="reason"
+						bind:value={docRejectionReason}
+						rows="3"
+						class="w-full border rounded-lg px-3 py-2"
+						placeholder="Explica por qué se rechaza el documento..."
+						required
+					></textarea>
+				</div>
+				<div class="flex gap-3 justify-end">
+					<button
+						type="button"
+						onclick={() => { showDocRejectModal = false; selectedDocType = ''; docRejectionReason = ''; }}
+						class="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+					>
+						Cancelar
+					</button>
+					<button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+						Rechazar
 					</button>
 				</div>
 			</form>
