@@ -5,6 +5,7 @@
 	import { initAnalytics, trackPageView } from '$lib/analytics';
 	import SEO from '$lib/components/SEO.svelte';
 	import CookieConsent from '$lib/components/CookieConsent.svelte';
+	import { InstallPrompt } from '$lib/components/pwa';
 
 	let { children } = $props();
 
@@ -24,3 +25,4 @@
 {@render children()}
 
 <CookieConsent />
+<InstallPrompt />

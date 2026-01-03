@@ -12,6 +12,7 @@
 	let savingUser = $state(false);
 	let savingTherapist = $state(false);
 	let savingCerts = $state(false);
+	let savingModalities = $state(false);
 	let successMessage = $state('');
 
 	// Form values
@@ -285,6 +286,74 @@
 		<div class="p-4 bg-gray-50 border-t border-gray-100 flex justify-end">
 			<button type="submit" disabled={savingCerts} class="btn-primary-gradient px-6 py-2 disabled:opacity-50">
 				{savingCerts ? 'Guardando...' : 'Guardar'}
+			</button>
+		</div>
+	</form>
+
+	<!-- Service Modalities -->
+	<form
+		method="POST"
+		action="?/updateServiceModalities"
+		use:enhance={() => {
+			savingModalities = true;
+			return async ({ result, update }) => {
+				savingModalities = false;
+				if (result.type === 'success') {
+					showSuccess('Modalidades de servicio actualizadas');
+					await invalidateAll();
+				}
+				await update();
+			};
+		}}
+		class="bg-white rounded-xl border border-gray-100"
+	>
+		<div class="p-4 border-b border-gray-100">
+			<h2 class="font-semibold text-gray-900">Modalidades de Servicio</h2>
+			<p class="text-sm text-gray-500 mt-1">Define cómo puedes atender a tus clientes</p>
+		</div>
+		<div class="p-4 space-y-4">
+			<label class="flex items-start gap-3 cursor-pointer">
+				<input
+					type="checkbox"
+					name="offers_home_visit"
+					checked={data.therapistProfile?.offers_home_visit ?? true}
+					class="checkbox checkbox-primary mt-0.5"
+				/>
+				<div>
+					<span class="font-medium text-gray-900">Visita a Domicilio</span>
+					<p class="text-sm text-gray-500">Puedo ir al domicilio del cliente</p>
+				</div>
+			</label>
+
+			<label class="flex items-start gap-3 cursor-pointer">
+				<input
+					type="checkbox"
+					name="offers_studio_visit"
+					checked={data.therapistProfile?.offers_studio_visit ?? false}
+					class="checkbox checkbox-primary mt-0.5"
+				/>
+				<div>
+					<span class="font-medium text-gray-900">Atención en Consultorio</span>
+					<p class="text-sm text-gray-500">Tengo un espacio donde puedo recibir clientes</p>
+				</div>
+			</label>
+
+			<label class="flex items-start gap-3 cursor-pointer">
+				<input
+					type="checkbox"
+					name="offers_online_video"
+					checked={data.therapistProfile?.offers_online_video ?? false}
+					class="checkbox checkbox-primary mt-0.5"
+				/>
+				<div>
+					<span class="font-medium text-gray-900">Sesiones por Video</span>
+					<p class="text-sm text-gray-500">Ofrezco consultas virtuales por videollamada (ideal para terapia psicológica, coaching, nutrición)</p>
+				</div>
+			</label>
+		</div>
+		<div class="p-4 bg-gray-50 border-t border-gray-100 flex justify-end">
+			<button type="submit" disabled={savingModalities} class="btn-primary-gradient px-6 py-2 disabled:opacity-50">
+				{savingModalities ? 'Guardando...' : 'Guardar'}
 			</button>
 		</div>
 	</form>

@@ -22,6 +22,10 @@ export interface SearchFilters {
 	longitude?: number;
 	radiusKm?: number;
 	query?: string;
+	// Service modality filters
+	offersOnlineVideo?: boolean;
+	offersHomeVisit?: boolean;
+	offersStudioVisit?: boolean;
 }
 
 export async function searchTherapists(
@@ -82,6 +86,17 @@ export async function searchTherapists(
 	// Text search in user name or bio
 	if (filters.query) {
 		query = query.or(`bio.ilike.%${filters.query}%,users.full_name.ilike.%${filters.query}%`);
+	}
+
+	// Filter by service modality
+	if (filters.offersOnlineVideo) {
+		query = query.eq('offers_online_video', true);
+	}
+	if (filters.offersHomeVisit) {
+		query = query.eq('offers_home_visit', true);
+	}
+	if (filters.offersStudioVisit) {
+		query = query.eq('offers_studio_visit', true);
 	}
 
 	const { data, error } = await query.limit(50);

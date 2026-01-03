@@ -24,6 +24,9 @@ export interface BookingEmailData {
 	scheduledAt: Date;
 	address: string;
 	priceCents: number;
+	// Video session fields (optional, for online_video modality)
+	bookingId?: string;
+	isVideoSession?: boolean;
 }
 
 const formatDate = (date: Date): string => {
@@ -107,15 +110,30 @@ export async function sendBookingConfirmationToClient(data: BookingEmailData): P
           <span class="detail-label">Hora</span>
           <span class="detail-value">${formatTime(data.scheduledAt)}</span>
         </div>
+        ${data.isVideoSession ? `
+        <div class="detail-row">
+          <span class="detail-label">Modalidad</span>
+          <span class="detail-value">Sesion de Video</span>
+        </div>
+        ` : `
         <div class="detail-row">
           <span class="detail-label">Direccion</span>
           <span class="detail-value">${data.address}</span>
         </div>
+        `}
         <div class="detail-row">
           <span class="detail-label">Total</span>
           <span class="detail-value">${formatPrice(data.priceCents)}</span>
         </div>
       </div>
+
+      ${data.isVideoSession && data.bookingId ? `
+      <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
+        <p style="margin: 0 0 15px; color: #166534; font-weight: 600;">Sesion de Video</p>
+        <p style="margin: 0 0 15px; color: #15803d; font-size: 14px;">Podras unirte 10 minutos antes de la hora programada.</p>
+        <a href="https://plenura.redbroomsoftware.com/session/${data.bookingId}" class="button" style="background: #16a34a;">Unirse a la Sesion</a>
+      </div>
+      ` : ''}
 
       <p style="text-align: center;">
         <a href="https://plenura.redbroomsoftware.com/bookings" class="button">Ver Mis Citas</a>
@@ -197,15 +215,29 @@ export async function sendNewBookingToTherapist(data: BookingEmailData): Promise
           <span class="detail-label">Hora</span>
           <span class="detail-value">${formatTime(data.scheduledAt)}</span>
         </div>
+        ${data.isVideoSession ? `
+        <div class="detail-row">
+          <span class="detail-label">Modalidad</span>
+          <span class="detail-value">Sesion de Video</span>
+        </div>
+        ` : `
         <div class="detail-row">
           <span class="detail-label">Direccion</span>
           <span class="detail-value">${data.address}</span>
         </div>
+        `}
         <div class="detail-row">
           <span class="detail-label">Pago</span>
           <span class="detail-value">${formatPrice(data.priceCents)}</span>
         </div>
       </div>
+
+      ${data.isVideoSession && data.bookingId ? `
+      <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
+        <p style="margin: 0 0 10px; color: #166534; font-weight: 600;">Sesion de Video Programada</p>
+        <p style="margin: 0; color: #15803d; font-size: 14px;">Podras unirte desde tu panel de control 10 minutos antes de la hora programada.</p>
+      </div>
+      ` : ''}
 
       <p style="text-align: center;">
         <a href="https://plenura.redbroomsoftware.com/therapist/bookings" class="button">Ver y Confirmar</a>

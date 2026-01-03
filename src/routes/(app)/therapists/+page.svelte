@@ -8,6 +8,7 @@
 	let selectedCategory = $state(data.filters.categoryId ?? '');
 	let selectedService = $state(data.filters.serviceId ?? '');
 	let minRating = $state(data.filters.minRating ?? 0);
+	let onlineOnly = $state(data.filters.offersOnlineVideo ?? false);
 	let showFilters = $state(false);
 
 	const categoryIcons: Record<string, string> = {
@@ -29,6 +30,7 @@
 		if (selectedCategory) params.set('category', selectedCategory);
 		if (selectedService) params.set('service', selectedService);
 		if (minRating > 0) params.set('rating', String(minRating));
+		if (onlineOnly) params.set('online', 'true');
 
 		goto(`/therapists?${params.toString()}`);
 	}
@@ -38,6 +40,7 @@
 		selectedCategory = '';
 		selectedService = '';
 		minRating = 0;
+		onlineOnly = false;
 		goto('/therapists');
 	}
 
@@ -104,6 +107,23 @@
 	<!-- Filters Panel -->
 	{#if showFilters}
 		<div class="bg-white rounded-xl border border-gray-200 p-4 space-y-4">
+			<!-- Online Video Toggle -->
+			<label class="flex items-center gap-3 p-3 bg-primary-50 rounded-lg cursor-pointer hover:bg-primary-100 transition-colors">
+				<input
+					type="checkbox"
+					bind:checked={onlineOnly}
+					onchange={applyFilters}
+					class="checkbox checkbox-primary"
+				/>
+				<div class="flex items-center gap-2">
+					<svg class="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+					</svg>
+					<span class="font-medium text-primary-900">Sesiones por Video Disponibles</span>
+				</div>
+				<span class="ml-auto text-xs text-primary-700 bg-primary-100 px-2 py-1 rounded-full">Nuevo</span>
+			</label>
+
 			<div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
 				<!-- Category Filter -->
 				<div>

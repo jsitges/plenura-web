@@ -11,6 +11,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const maxPrice = url.searchParams.get('maxPrice') ? Number(url.searchParams.get('maxPrice')) : undefined;
 	const minRating = url.searchParams.get('rating') ? Number(url.searchParams.get('rating')) : undefined;
 	const query = url.searchParams.get('q') ?? undefined;
+	const offersOnlineVideo = url.searchParams.get('online') === 'true' ? true : undefined;
 
 	// Fetch data in parallel
 	const [categories, services, therapists] = await Promise.all([
@@ -22,7 +23,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			minPrice,
 			maxPrice,
 			minRating,
-			query
+			query,
+			offersOnlineVideo
 		})
 	]);
 
@@ -36,7 +38,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			minPrice,
 			maxPrice,
 			minRating,
-			query
+			query,
+			offersOnlineVideo
 		}
 	};
 };

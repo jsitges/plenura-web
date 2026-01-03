@@ -58,6 +58,11 @@
 	}
 
 	const statusInfo = getStatusInfo(booking.status);
+
+	// Wallet payment
+	const wallet = data.wallet;
+	const canPayWithWallet = wallet && wallet.balanceCents >= booking.price_cents;
+	let payingWithWallet = $state(false);
 </script>
 
 <svelte:head>
@@ -207,53 +212,99 @@
 
 		<!-- Payment Action for Pending Bookings -->
 		{#if booking.status === 'pending'}
-			<form
-				method="POST"
-				action="?/pay"
-				class="mt-4"
-				use:enhance={() => {
-					paying = true;
-					return async ({ update }) => {
-						await update();
-						paying = false;
-					};
-				}}
-			>
-				<button
-					type="submit"
-					disabled={paying}
-					class="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+			<div class="mt-4 space-y-3">
+				<!-- Wallet Payment Option -->
+				{#if wallet}
+					<div class="bg-primary-50 rounded-lg p-4">
+						<div class="flex items-center justify-between mb-2">
+							<span class="text-sm font-medium text-primary-900">Tu cartera</span>
+							<span class="text-sm font-bold text-primary-700">
+								{formatPrice(wallet.balanceCents / 100)}
+							</span>
+						</div>
+						{#if canPayWithWallet}
+							<form
+								method="POST"
+								action="?/payWithWallet"
+								use:enhance={() => {
+									payingWithWallet = true;
+									return async ({ update }) => {
+										await update();
+										payingWithWallet = false;
+									};
+								}}
+							>
+								<button
+									type="submit"
+									disabled={payingWithWallet}
+									class="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+								>
+									{#if payingWithWallet}
+										<svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+											<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+											<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+										</svg>
+										Procesando...
+									{:else}
+										<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+										</svg>
+										Pagar con cartera
+									{/if}
+								</button>
+							</form>
+						{:else}
+							<div class="text-xs text-primary-700">
+								Te faltan {formatPrice((booking.price_cents - wallet.balanceCents) / 100)} para pagar con cartera.
+								<a href="/wallet" class="underline font-medium">Agregar fondos</a>
+							</div>
+						{/if}
+					</div>
+				{:else}
+					<a href="/wallet" class="block text-center text-sm text-primary-600 hover:text-primary-700">
+						Crea tu cartera para pagos más rápidos &rarr;
+					</a>
+				{/if}
+
+				<!-- Divider -->
+				<div class="flex items-center gap-3">
+					<hr class="flex-1" />
+					<span class="text-xs text-gray-400">o</span>
+					<hr class="flex-1" />
+				</div>
+
+				<!-- Card Payment -->
+				<form
+					method="POST"
+					action="?/pay"
+					use:enhance={() => {
+						paying = true;
+						return async ({ update }) => {
+							await update();
+							paying = false;
+						};
+					}}
 				>
-					{#if paying}
-						<svg class="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
-							<circle
-								class="opacity-25"
-								cx="12"
-								cy="12"
-								r="10"
-								stroke="currentColor"
-								stroke-width="4"
-							></circle>
-							<path
-								class="opacity-75"
-								fill="currentColor"
-								d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-							></path>
-						</svg>
-						Procesando...
-					{:else}
-						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-							/>
-						</svg>
-						Pagar ahora
-					{/if}
-				</button>
-			</form>
+					<button
+						type="submit"
+						disabled={paying}
+						class="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+					>
+						{#if paying}
+							<svg class="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+								<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+								<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+							</svg>
+							Procesando...
+						{:else}
+							<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+							</svg>
+							Pagar con tarjeta
+						{/if}
+					</button>
+				</form>
+			</div>
 
 			<p class="mt-3 text-xs text-gray-500 text-center">
 				Tu pago estará protegido en escrow hasta que el servicio se complete

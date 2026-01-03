@@ -23,6 +23,7 @@ import {
 	sendBookingCancellationWhatsApp,
 	sendReviewRequestWhatsApp
 } from './whatsapp.service';
+import { createVideoSession, isVideoEnabled } from './video.service';
 
 // Subscription tiers that have WhatsApp enabled
 const WHATSAPP_ENABLED_TIERS = ['business', 'enterprise'];
@@ -47,8 +48,10 @@ export interface CreateBookingInput {
 	therapistId: string;
 	therapistServiceId: string;
 	scheduledAt: string;
-	clientAddress: string;
+	clientAddress?: string;  // Optional for online_video modality
 	clientNotes?: string;
+	// Service modality (defaults to home_visit for backward compatibility)
+	serviceModality?: 'home_visit' | 'studio_visit' | 'neutral_location' | 'online_video';
 	// Practice booking fields (optional)
 	practiceId?: string;
 	assignedBy?: string;  // User ID who assigned (for practice_assigns mode)
@@ -167,13 +170,22 @@ export async function createBooking(
 		return { data: null, error: 'Este horario ya no está disponible' };
 	}
 
+	// Determine service modality (default to home_visit for backward compatibility)
+	const serviceModality = input.serviceModality || 'home_visit';
+
+	// Validate address for non-online modalities
+	if (serviceModality !== 'online_video' && !input.clientAddress) {
+		return { data: null, error: 'La dirección es requerida para este tipo de servicio' };
+	}
+
 	// Create the booking with commission details
 	const bookingData: Record<string, unknown> = {
 		therapist_id: input.therapistId,
 		therapist_service_id: input.therapistServiceId,
 		scheduled_at: input.scheduledAt,
 		scheduled_end_at: endTime.toISOString(),
-		client_address: input.clientAddress,
+		client_address: serviceModality === 'online_video' ? null : input.clientAddress,
+		service_modality: serviceModality,
 		notes: input.clientNotes,
 		price_cents: svc.price_cents,
 		commission_cents: plenuraCommissionCents,
@@ -196,6 +208,20 @@ export async function createBooking(
 	if (error) {
 		console.error('Error creating booking:', error);
 		return { data: null, error: 'Error al crear la reserva' };
+	}
+
+	// Create video session for online_video bookings
+	if (serviceModality === 'online_video' && isVideoEnabled()) {
+		try {
+			await createVideoSession(supabase, {
+				bookingId: data.id,
+				scheduledStart: input.scheduledAt,
+				scheduledEnd: endTime.toISOString()
+			});
+		} catch (videoError) {
+			console.error('Error creating video session:', videoError);
+			// Don't fail the booking, just log the error
+		}
 	}
 
 	// Send email notifications (fire and forget)
@@ -232,8 +258,10 @@ async function sendBookingEmails(
 	if (!booking) return;
 
 	const b = booking as unknown as {
+		id: string;
 		scheduled_at: string;
 		client_address: string;
+		service_modality: string;
 		price_cents: number;
 		users: { full_name: string; email: string; phone: string | null };
 		therapists: {
@@ -243,6 +271,8 @@ async function sendBookingEmails(
 		therapist_services: { services: { name: string } };
 	};
 
+	const isVideoSession = b.service_modality === 'online_video';
+
 	const emailData: BookingEmailData = {
 		clientName: b.users.full_name,
 		clientEmail: b.users.email,
@@ -251,7 +281,9 @@ async function sendBookingEmails(
 		serviceName: b.therapist_services.services.name,
 		scheduledAt: new Date(b.scheduled_at),
 		address: b.client_address ?? '',
-		priceCents: b.price_cents
+		priceCents: b.price_cents,
+		bookingId: b.id,
+		isVideoSession
 	};
 
 	const whatsAppData = {
@@ -260,7 +292,8 @@ async function sendBookingEmails(
 		serviceName: b.therapist_services.services.name,
 		scheduledAt: new Date(b.scheduled_at),
 		address: b.client_address ?? '',
-		priceCents: b.price_cents
+		priceCents: b.price_cents,
+		isVideoSession
 	};
 
 	// Send email notifications in parallel

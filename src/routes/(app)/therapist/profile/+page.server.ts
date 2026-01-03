@@ -126,5 +126,41 @@ export const actions: Actions = {
 		}
 
 		return { success: true, message: 'Certificaciones actualizadas' };
+	},
+
+	updateServiceModalities: async ({ request, locals }) => {
+		const { supabase, user } = locals;
+		const formData = await request.formData();
+
+		const offersHomeVisit = formData.get('offers_home_visit') === 'on';
+		const offersStudioVisit = formData.get('offers_studio_visit') === 'on';
+		const offersOnlineVideo = formData.get('offers_online_video') === 'on';
+
+		// Get therapist ID
+		const { data: therapist } = await supabase
+			.from('therapists')
+			.select('id')
+			.eq('user_id', user!.id)
+			.single();
+
+		if (!therapist) {
+			return fail(403, { error: 'No autorizado' });
+		}
+
+		const { error } = await supabase
+			.from('therapists')
+			.update({
+				offers_home_visit: offersHomeVisit,
+				offers_studio_visit: offersStudioVisit,
+				offers_online_video: offersOnlineVideo
+			})
+			.eq('id', (therapist as { id: string }).id);
+
+		if (error) {
+			console.error('Error updating service modalities:', error);
+			return fail(500, { error: 'Error al actualizar las modalidades de servicio' });
+		}
+
+		return { success: true, message: 'Modalidades de servicio actualizadas' };
 	}
 };
