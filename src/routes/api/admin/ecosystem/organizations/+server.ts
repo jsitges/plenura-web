@@ -50,36 +50,32 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 			throw error(500, 'Failed to fetch ecosystem organizations');
 		}
 
-		// Transform to Camino-compatible format
+		// Transform to match Colectiva's format exactly
 		const formatted = (organizations || []).map((org: any) => ({
 			id: org.ecosystem_org_id,
 			name: org.organization_name,
-			email: org.email,
-			businessType: org.business_type,
-			subscriptionTier: org.subscription_tier,
-			verificationStatus: org.verification_status,
-			isActive: org.is_active,
-			location: org.location,
-			memberCount: org.member_count,
-			rating: org.rating_avg,
-			createdAt: org.created_at,
+			rfc: org.metadata?.tax_id || null,
+			type: org.business_type || 'business',
 			linkedApps: {
 				plenura: {
-					appId: 'plenura',
-					orgId: org.ecosystem_org_id,
-					subscriptionStatus: org.is_active ? 'active' : 'inactive',
-					subscriptionTier: org.subscription_tier
+					org_id: org.ecosystem_org_id,
+					name: org.organization_name,
+					syncEnabled: true
 				}
 			},
-			metadata: org.metadata
+			billing: {
+				plan: org.subscription_tier || 'free',
+				status: org.is_active ? 'active' : 'inactive'
+			},
+			memberCount: org.member_count || 1,
+			createdAt: org.created_at
 		}));
 
 		return json({
 			success: true,
-			organizations: formatted,
-			total: formatted.length,
-			limit,
-			offset
+			orgs: formatted,  // Match Colectiva's response key
+			count: formatted.length,
+			total: formatted.length
 		});
 	} catch (err: any) {
 		console.error('[Plenura Ecosystem] Error:', err);
