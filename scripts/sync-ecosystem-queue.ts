@@ -16,14 +16,18 @@
  *   --all        Process all pending items
  */
 
+import { config } from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 
+// Load environment variables from .env file
+config();
+
 const SUPABASE_URL = process.env.PUBLIC_SUPABASE_URL || 'http://localhost:54321';
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const COLECTIVA_URL = process.env.COLECTIVA_API_URL || 'https://colectiva.redbroomsoftware.com';
 const COLECTIVA_API_KEY = process.env.COLECTIVA_API_KEY || '';
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 interface QueueItem {
 	id: string;
@@ -226,7 +230,7 @@ async function syncQueue(options: { dryRun: boolean; limit: number }) {
 		process.exit(1);
 	}
 
-	if (!SUPABASE_SERVICE_KEY) {
+	if (!SUPABASE_SERVICE_ROLE_KEY) {
 		console.error('❌ SUPABASE_SERVICE_ROLE_KEY environment variable is required');
 		process.exit(1);
 	}
