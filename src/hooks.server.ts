@@ -11,6 +11,39 @@ Sentry.init({
 	tracesSampleRate: 1.0
 });
 
+// Developer session middleware - handles cross-app developer access
+const developerSessionHandle: Handle = async ({ event, resolve }) => {
+	const developerSessionCookie = event.cookies.get('developer_session');
+
+	if (developerSessionCookie) {
+		try {
+			const developerSession = JSON.parse(developerSessionCookie);
+
+			// Check if session is expired
+			const expiresAt = new Date(developerSession.expires_at);
+			if (expiresAt > new Date()) {
+				// Valid developer session
+				event.locals.developerSession = developerSession;
+				console.log(`[DevSession] Developer ${developerSession.developer_email} accessing org ${developerSession.target_org.name}`);
+			} else {
+				// Expired, clear cookie
+				event.cookies.delete('developer_session', { path: '/' });
+				event.locals.developerSession = null;
+				console.log('[DevSession] Expired developer session, cleared cookie');
+			}
+		} catch (err) {
+			// Invalid JSON, clear cookie
+			event.cookies.delete('developer_session', { path: '/' });
+			event.locals.developerSession = null;
+			console.error('[DevSession] Invalid developer session cookie:', err);
+		}
+	} else {
+		event.locals.developerSession = null;
+	}
+
+	return resolve(event);
+};
+
 const supabaseHandle: Handle = async ({ event, resolve }) => {
 	// Create Supabase client for this request
 	const supabase = createServerSupabaseClient(event);
@@ -56,8 +89,8 @@ const supabaseHandle: Handle = async ({ event, resolve }) => {
 	});
 };
 
-// Combine Sentry and Supabase handles
-export const handle = sequence(Sentry.sentryHandle(), supabaseHandle);
+// Combine all handles: developer session first, then Sentry, then Supabase
+export const handle = sequence(developerSessionHandle, Sentry.sentryHandle(), supabaseHandle);
 
 // Error handler with Sentry
 export const handleError: HandleServerError = Sentry.handleErrorWithSentry();
