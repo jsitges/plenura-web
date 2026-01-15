@@ -122,7 +122,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================================================
--- 3. UPDATE EXISTING PRACTICES WITH ECOSYSTEM ORG IDs
+-- 3. ADD ECOSYSTEM ORG ID COLUMNS
 -- ============================================================================
 
 -- Add ecosystem_org_id to practices if not exists
@@ -131,16 +131,22 @@ ADD COLUMN IF NOT EXISTS ecosystem_org_id TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_practices_ecosystem_org_id ON practices(ecosystem_org_id);
 
+-- Add ecosystem_org_id to therapists if not exists (from migration 006)
+ALTER TABLE therapists
+ADD COLUMN IF NOT EXISTS ecosystem_org_id TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_therapists_ecosystem_org_id ON therapists(ecosystem_org_id);
+
+-- ============================================================================
+-- 4. GENERATE ECOSYSTEM ORG IDs FOR EXISTING ENTITIES
+-- ============================================================================
+
 -- Generate ecosystem org IDs for existing practices
 UPDATE practices
 SET ecosystem_org_id = 'plenura_' || replace(id::text, '-', '')
 WHERE ecosystem_org_id IS NULL;
 
--- ============================================================================
--- 4. UPDATE EXISTING INDEPENDENT THERAPISTS WITH ECOSYSTEM ORG IDs
--- ============================================================================
-
--- Generate ecosystem org IDs for independent therapists
+-- Generate ecosystem org IDs for existing independent therapists
 UPDATE therapists
 SET ecosystem_org_id = 'plenura_therapist_' || replace(id::text, '-', '')
 WHERE ecosystem_org_id IS NULL
