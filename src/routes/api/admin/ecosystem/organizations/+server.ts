@@ -1,10 +1,14 @@
 /**
- * Plenura Ecosystem Organizations API
+ * Plenura Ecosystem Organizations API (Internal/Admin Only)
  *
- * Lists all Plenura organizations (practices + independent therapists)
- * for display in Camino's ecosystem dashboard.
+ * Lists all Plenura organizations (practices + independent therapists).
  *
- * Authentication: Requires admin access or valid ecosystem signature
+ * ⚠️ IMPORTANT: This endpoint is for internal/admin use only.
+ * For ecosystem integration, Plenura registers organizations TO Colectiva
+ * via POST /api/ecosystem-orgs (following the same pattern as Caracol,
+ * La Hoja, and Cosmos Pet). External apps should query Colectiva, not this endpoint.
+ *
+ * Authentication: Requires admin access
  */
 
 import { json, error } from '@sveltejs/kit';
