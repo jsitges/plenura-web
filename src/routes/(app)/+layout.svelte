@@ -10,9 +10,9 @@
 	let menuOpen = $state(false);
 	let userMenuOpen = $state(false);
 
-	// Redirect if not authenticated
+	// Redirect if not authenticated (allow either Supabase session or developer session)
 	onMount(() => {
-		if (!data.session) {
+		if (!data.session && !data.developerSession) {
 			goto('/login?redirect=' + encodeURIComponent($page.url.pathname));
 		}
 	});
@@ -37,7 +37,7 @@
 	<title>Dashboard - Plenura</title>
 </svelte:head>
 
-{#if data.session}
+{#if data.session || data.developerSession}
 	<div class="min-h-screen bg-gray-50">
 		<!-- Navigation -->
 		<nav class="bg-white border-b border-gray-200 sticky top-0 z-50">
@@ -103,7 +103,7 @@
 							>
 								<div class="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
 									<span class="text-primary-700 text-sm font-medium">
-										{getInitials(data.userProfile?.full_name ?? data.user?.email)}
+										{getInitials(data.developerSession?.developer_name ?? data.userProfile?.full_name ?? data.user?.email)}
 									</span>
 								</div>
 								<svg class="w-4 h-4 text-gray-500 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -113,10 +113,24 @@
 
 							{#if userMenuOpen}
 								<div class="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50">
-									<div class="px-4 py-2 border-b border-gray-100">
-										<p class="text-sm font-medium text-gray-900">{data.userProfile?.full_name ?? 'Usuario'}</p>
-										<p class="text-xs text-gray-500">{data.user?.email}</p>
-									</div>
+									{#if data.developerSession}
+										<div class="px-4 py-2 border-b border-gray-100 bg-blue-50">
+											<div class="flex items-center gap-1 mb-1">
+												<svg class="w-3 h-3 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+													<path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+												</svg>
+												<p class="text-xs font-semibold text-blue-700">Modo Desarrollador</p>
+											</div>
+											<p class="text-sm font-medium text-gray-900">{data.developerSession.developer_name}</p>
+											<p class="text-xs text-gray-600">{data.developerSession.developer_email}</p>
+											<p class="text-xs text-blue-600 mt-1">Accediendo: {data.developerSession.target_org.name}</p>
+										</div>
+									{:else}
+										<div class="px-4 py-2 border-b border-gray-100">
+											<p class="text-sm font-medium text-gray-900">{data.userProfile?.full_name ?? 'Usuario'}</p>
+											<p class="text-xs text-gray-500">{data.user?.email}</p>
+										</div>
+									{/if}
 									{#if data.therapistProfile}
 									<a href="/therapist/profile" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
 										Mi Perfil de Terapeuta
