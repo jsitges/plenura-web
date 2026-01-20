@@ -1,37 +1,81 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { slide } from 'svelte/transition';
 
-	let { data } = $props();
+	let { data, form } = $props();
 
 	const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
+	type TimeSlot = {
+		start: string;
+		end: string;
+		id?: string; // For tracking in the UI
+	};
+
+	type DaySchedule = {
+		active: boolean;
+		slots: TimeSlot[];
+	};
+
 	// Initialize schedule state from data
-	let schedule = $state(
-		dayNames.map((_, index) => {
-			const existing = data.availability.find((a: { day_of_week: number }) => a.day_of_week === index) as { start_time: string; end_time: string } | undefined;
+	let schedule = $state<DaySchedule[]>(
+		dayNames.map((_, dayIndex) => {
+			const daySlots = data.availability.filter((a: { day_of_week: number }) => a.day_of_week === dayIndex) as { start_time: string; end_time: string }[];
+
+			if (daySlots.length > 0) {
+				return {
+					active: true,
+					slots: daySlots.map(slot => ({
+						start: slot.start_time,
+						end: slot.end_time,
+						id: crypto.randomUUID()
+					}))
+				};
+			}
+
 			return {
-				active: !!existing,
-				start: existing?.start_time ?? '09:00',
-				end: existing?.end_time ?? '18:00'
+				active: false,
+				slots: [{ start: '09:00', end: '18:00', id: crypto.randomUUID() }]
 			};
 		})
 	);
 
 	let isAvailable = $state(data.isAvailable);
 	let saving = $state(false);
+	let showSuccessMessage = $state(false);
+
+	function addTimeSlot(dayIndex: number) {
+		schedule[dayIndex].slots.push({
+			start: '09:00',
+			end: '18:00',
+			id: crypto.randomUUID()
+		});
+	}
+
+	function removeTimeSlot(dayIndex: number, slotIndex: number) {
+		if (schedule[dayIndex].slots.length > 1) {
+			schedule[dayIndex].slots.splice(slotIndex, 1);
+		}
+	}
 
 	function copyToWeekdays(dayIndex: number) {
 		const source = schedule[dayIndex];
 		// Copy to Monday-Friday (1-5)
 		for (let i = 1; i <= 5; i++) {
-			schedule[i] = { ...source };
+			schedule[i] = {
+				active: source.active,
+				slots: source.slots.map(slot => ({ ...slot, id: crypto.randomUUID() }))
+			};
 		}
 	}
 
 	function copyToAll(dayIndex: number) {
 		const source = schedule[dayIndex];
 		for (let i = 0; i < 7; i++) {
-			schedule[i] = { ...source };
+			schedule[i] = {
+				active: source.active,
+				slots: source.slots.map(slot => ({ ...slot, id: crypto.randomUUID() }))
+			};
 		}
 	}
 
@@ -39,6 +83,16 @@
 		const hour = Math.floor(i / 2);
 		const minute = (i % 2) * 30;
 		return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+	});
+
+	// Show success message when form submission succeeds
+	$effect(() => {
+		if (form?.success) {
+			showSuccessMessage = true;
+			setTimeout(() => {
+				showSuccessMessage = false;
+			}, 3000);
+		}
 	});
 </script>
 
@@ -72,6 +126,21 @@
 		</form>
 	</div>
 
+	<!-- Success Message -->
+	{#if showSuccessMessage}
+		<div transition:slide class="bg-green-50 border border-green-200 rounded-xl p-4">
+			<div class="flex items-start gap-3">
+				<svg class="w-5 h-5 text-green-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+				</svg>
+				<div>
+					<p class="font-medium text-green-800">Horario guardado correctamente</p>
+					<p class="text-sm text-green-600">Tus cambios han sido aplicados</p>
+				</div>
+			</div>
+		</div>
+	{/if}
+
 	{#if !isAvailable}
 		<div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
 			<div class="flex items-start gap-3">
@@ -100,71 +169,112 @@
 	>
 		<div class="p-4 border-b border-gray-100">
 			<h2 class="font-semibold text-gray-900">Horario Semanal</h2>
-			<p class="text-sm text-gray-500">Define los días y horarios en los que estás disponible</p>
+			<p class="text-sm text-gray-500">Define los días y horarios en los que estás disponible. Puedes agregar múltiples bloques para manejar pausas de comida.</p>
 		</div>
 
 		<div class="divide-y divide-gray-100">
-			{#each dayNames as day, index}
-				<div class="p-4 flex flex-col sm:flex-row sm:items-center gap-4">
-					<!-- Day Toggle -->
-					<div class="flex items-center gap-3 sm:w-40">
-						<input
-							type="checkbox"
-							name="day_{index}_active"
-							bind:checked={schedule[index].active}
-							class="h-5 w-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-						/>
-						<span class="font-medium text-gray-700">{day}</span>
-					</div>
-
-					<!-- Time Selection -->
-					{#if schedule[index].active}
-						<div class="flex items-center gap-3 flex-1">
-							<select
-								name="day_{index}_start"
-								bind:value={schedule[index].start}
-								class="input-wellness py-2"
-							>
-								{#each timeSlots as time}
-									<option value={time}>{time}</option>
-								{/each}
-							</select>
-							<span class="text-gray-500">a</span>
-							<select
-								name="day_{index}_end"
-								bind:value={schedule[index].end}
-								class="input-wellness py-2"
-							>
-								{#each timeSlots as time}
-									<option value={time}>{time}</option>
-								{/each}
-							</select>
+			{#each dayNames as day, dayIndex}
+				<div class="p-4">
+					<!-- Day Header -->
+					<div class="flex items-center justify-between mb-3">
+						<div class="flex items-center gap-3">
+							<input
+								type="checkbox"
+								name="day_{dayIndex}_active"
+								bind:checked={schedule[dayIndex].active}
+								class="h-5 w-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+							/>
+							<span class="font-medium text-gray-700">{day}</span>
 						</div>
 
-						<!-- Copy Actions -->
-						<div class="flex items-center gap-2">
+						{#if schedule[dayIndex].active}
+							<!-- Copy Actions -->
+							<div class="flex items-center gap-2">
+								<button
+									type="button"
+									onclick={() => copyToWeekdays(dayIndex)}
+									class="text-xs text-primary-600 hover:text-primary-700 whitespace-nowrap"
+								>
+									Copiar a L-V
+								</button>
+								<span class="text-gray-300">|</span>
+								<button
+									type="button"
+									onclick={() => copyToAll(dayIndex)}
+									class="text-xs text-primary-600 hover:text-primary-700 whitespace-nowrap"
+								>
+									Copiar a todos
+								</button>
+							</div>
+						{/if}
+					</div>
+
+					<!-- Time Slots -->
+					{#if schedule[dayIndex].active}
+						<div class="space-y-2 pl-8">
+							{#each schedule[dayIndex].slots as slot, slotIndex (slot.id)}
+								<div class="flex items-center gap-3" transition:slide>
+									<!-- Hidden inputs for form submission -->
+									<input type="hidden" name="day_{dayIndex}_slot_{slotIndex}_start" value={slot.start} />
+									<input type="hidden" name="day_{dayIndex}_slot_{slotIndex}_end" value={slot.end} />
+
+									<select
+										bind:value={slot.start}
+										class="input-wellness py-2 flex-1"
+									>
+										{#each timeSlots as time}
+											<option value={time}>{time}</option>
+										{/each}
+									</select>
+									<span class="text-gray-500">a</span>
+									<select
+										bind:value={slot.end}
+										class="input-wellness py-2 flex-1"
+									>
+										{#each timeSlots as time}
+											<option value={time}>{time}</option>
+										{/each}
+									</select>
+
+									<!-- Remove button (only show if more than one slot) -->
+									{#if schedule[dayIndex].slots.length > 1}
+										<button
+											type="button"
+											on:click={() => removeTimeSlot(dayIndex, slotIndex)}
+											class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+											title="Eliminar horario"
+										>
+											<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+											</svg>
+										</button>
+									{/if}
+								</div>
+							{/each}
+
+							<!-- Add Time Slot Button -->
 							<button
 								type="button"
-								onclick={() => copyToWeekdays(index)}
-								class="text-xs text-primary-600 hover:text-primary-700 whitespace-nowrap"
+								on:click={() => addTimeSlot(dayIndex)}
+								class="flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700 py-2"
 							>
-								Copiar a L-V
-							</button>
-							<span class="text-gray-300">|</span>
-							<button
-								type="button"
-								onclick={() => copyToAll(index)}
-								class="text-xs text-primary-600 hover:text-primary-700 whitespace-nowrap"
-							>
-								Copiar a todos
+								<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+								</svg>
+								Agregar otro horario
 							</button>
 						</div>
 					{:else}
-						<span class="text-sm text-gray-400 italic">No disponible</span>
+						<p class="text-sm text-gray-400 italic pl-8">No disponible</p>
 					{/if}
 				</div>
 			{/each}
 		</div>
+
+		<!-- Hidden input with slot count for each day -->
+		{#each schedule as day, dayIndex}
+			<input type="hidden" name="day_{dayIndex}_slot_count" value={day.active ? day.slots.length : 0} />
+		{/each}
 
 		<div class="p-4 bg-gray-50 border-t border-gray-100 flex justify-end">
 			<button
@@ -177,13 +287,37 @@
 		</div>
 	</form>
 
+	<!-- Blocked Periods Link -->
+	<a
+		href="/therapist/availability/blocked"
+		class="block bg-amber-50 border border-amber-200 rounded-xl p-4 hover:bg-amber-100 transition-colors"
+	>
+		<div class="flex items-center justify-between">
+			<div class="flex items-center gap-3">
+				<div class="w-10 h-10 bg-amber-200 rounded-lg flex items-center justify-center">
+					<svg class="w-5 h-5 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+					</svg>
+				</div>
+				<div>
+					<h3 class="font-medium text-amber-900">Gestionar períodos bloqueados</h3>
+					<p class="text-sm text-amber-700">Bloquea días o semanas para vacaciones</p>
+				</div>
+			</div>
+			<svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+			</svg>
+		</div>
+	</a>
+
 	<!-- Tips -->
 	<div class="bg-blue-50 border border-blue-200 rounded-xl p-4">
 		<h3 class="font-medium text-blue-800 mb-2">Consejos</h3>
 		<ul class="text-sm text-blue-700 space-y-1">
 			<li>• Los clientes solo pueden reservar dentro de tu horario disponible</li>
-			<li>• Deja tiempo entre citas para desplazamiento</li>
-			<li>• Puedes bloquear días específicos desde tu calendario</li>
+			<li>• Puedes agregar múltiples bloques de horario para manejar pausas de comida</li>
+			<li>• Ejemplo: 10:00-13:00 y 17:00-20:00 para tener pausa de comida de 13:00-17:00</li>
+			<li>• Usa "Períodos bloqueados" para bloquear días completos (vacaciones, días festivos, etc.)</li>
 		</ul>
 	</div>
 </div>

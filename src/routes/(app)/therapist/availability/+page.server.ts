@@ -44,7 +44,7 @@ export const actions: Actions = {
 			return fail(403, { error: 'No autorizado' });
 		}
 
-		// Parse the availability data
+		// Parse the availability data - now supporting multiple slots per day
 		const slots: Array<{
 			day_of_week: number;
 			start_time: string;
@@ -54,16 +54,23 @@ export const actions: Actions = {
 
 		for (let day = 0; day < 7; day++) {
 			const isActive = formData.get(`day_${day}_active`) === 'on';
-			const startTime = formData.get(`day_${day}_start`) as string;
-			const endTime = formData.get(`day_${day}_end`) as string;
+			const slotCount = parseInt(formData.get(`day_${day}_slot_count`) as string) || 0;
 
-			if (isActive && startTime && endTime) {
-				slots.push({
-					day_of_week: day,
-					start_time: startTime,
-					end_time: endTime,
-					is_active: true
-				});
+			if (isActive && slotCount > 0) {
+				// Process each time slot for this day
+				for (let slotIndex = 0; slotIndex < slotCount; slotIndex++) {
+					const startTime = formData.get(`day_${day}_slot_${slotIndex}_start`) as string;
+					const endTime = formData.get(`day_${day}_slot_${slotIndex}_end`) as string;
+
+					if (startTime && endTime) {
+						slots.push({
+							day_of_week: day,
+							start_time: startTime,
+							end_time: endTime,
+							is_active: true
+						});
+					}
+				}
 			}
 		}
 
