@@ -240,7 +240,7 @@
 									{#if schedule[dayIndex].slots.length > 1}
 										<button
 											type="button"
-											on:click={() => removeTimeSlot(dayIndex, slotIndex)}
+											onclick={() => removeTimeSlot(dayIndex, slotIndex)}
 											class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
 											title="Eliminar horario"
 										>
@@ -255,7 +255,7 @@
 							<!-- Add Time Slot Button -->
 							<button
 								type="button"
-								on:click={() => addTimeSlot(dayIndex)}
+								onclick={() => addTimeSlot(dayIndex)}
 								class="flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700 py-2"
 							>
 								<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
