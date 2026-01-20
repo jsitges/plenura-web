@@ -81,7 +81,7 @@ export async function GET({ url, cookies }: RequestEvent) {
 		});
 
 		// Redirect to dashboard
-		redirect(303, '/dashboard?developer_mode=true');
+		throw redirect(303, '/dashboard?developer_mode=true');
 	} catch (err: unknown) {
 		if (err && typeof err === 'object' && 'status' in err && err.status === 303) throw err; // Redirect
 		const error = err as Error;
