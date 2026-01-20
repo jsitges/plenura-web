@@ -13,7 +13,7 @@
 
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { getServiceSupabase } from '$lib/supabase/server';
+import { createServiceRoleClient } from '$lib/supabase/server';
 
 /**
  * GET /api/admin/ecosystem/organizations
@@ -32,7 +32,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 	}
 
 	try {
-		const supabase = getServiceSupabase();
+		const supabase = createServiceRoleClient();
 
 		// Get query params
 		const search = url.searchParams.get('search') || null;
