@@ -32,6 +32,42 @@
 	const imageUrl = $derived(
 		image.startsWith('http') ? image : `${PUBLIC_APP_URL}${image}`
 	);
+
+	// Structured data for SEO
+	const structuredData = {
+		"@context": "https://schema.org",
+		"@graph": [
+			{
+				"@type": "SoftwareApplication",
+				"@id": "https://plenura.redbroomsoftware.com/#application",
+				"name": "Plenura",
+				"alternateName": ["Plenura Wellness", "RBS Wellness"],
+				"description": "Plataforma de bienestar y terapias en México. Encuentra masajistas, terapeutas y profesionales de bienestar verificados.",
+				"url": "https://plenura.redbroomsoftware.com",
+				"applicationCategory": "HealthApplication",
+				"operatingSystem": "Web",
+				"author": { "@type": "Organization", "@id": "https://redbroomsoftware.com/#organization" },
+				"publisher": { "@type": "Organization", "@id": "https://redbroomsoftware.com/#organization" },
+				"featureList": ["Therapist Discovery", "Online Booking", "Verified Professionals", "Reviews & Ratings"],
+				"inLanguage": ["es-MX"]
+			},
+			{
+				"@type": "Organization",
+				"@id": "https://redbroomsoftware.com/#organization",
+				"name": "Red Broom Software",
+				"alternateName": ["RBS", "RedBroom"],
+				"url": "https://redbroomsoftware.com"
+			},
+			{
+				"@type": "WebSite",
+				"@id": "https://plenura.redbroomsoftware.com/#website",
+				"url": "https://plenura.redbroomsoftware.com",
+				"name": "Plenura",
+				"publisher": { "@type": "Organization", "@id": "https://redbroomsoftware.com/#organization" },
+				"isPartOf": { "@type": "WebSite", "@id": "https://redbroomsoftware.com/#website" }
+			}
+		]
+	};
 </script>
 
 <svelte:head>
@@ -67,4 +103,7 @@
 	<meta name="theme-color" content="#16a34a" />
 	<meta name="apple-mobile-web-app-title" content={siteName} />
 	<meta name="application-name" content={siteName} />
+
+	<!-- Structured Data -->
+	{@html `<script type="application/ld+json">${JSON.stringify(structuredData)}</script>`}
 </svelte:head>

@@ -1,0 +1,19 @@
+# Plenura Wellness - robots.txt
+# https://plenura.redbroomsoftware.com
+
+User-agent: *
+Allow: /
+Allow: /terapeutas/
+Allow: /servicios/
+Allow: /buscar/
+Disallow: /api/
+Disallow: /dashboard/
+Disallow: /admin/
+Disallow: /practice/
+Disallow: /therapist/
+
+# Sitemap
+Sitemap: https://plenura.redbroomsoftware.com/sitemap.xml
+
+# Crawl delay
+Crawl-delay: 1
