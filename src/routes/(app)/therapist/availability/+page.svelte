@@ -26,8 +26,8 @@
 				return {
 					active: true,
 					slots: daySlots.map(slot => ({
-						start: slot.start_time,
-						end: slot.end_time,
+						start: slot.start_time.substring(0, 5),
+						end: slot.end_time.substring(0, 5),
 						id: crypto.randomUUID()
 					}))
 				};
