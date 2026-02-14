@@ -768,19 +768,37 @@ export async function getAvailableSlots(
 	const dateObj = new Date(date);
 	const dayOfWeek = dateObj.getDay();
 
-	// Get therapist availability for this day
-	const { data: availability } = await supabase
+	// Get therapist info including smart_schedule_grouping setting
+	const { data: therapist } = await supabase
+		.from('therapists')
+		.select('smart_schedule_grouping')
+		.eq('id', therapistId)
+		.single();
+
+	const smartGrouping = (therapist as { smart_schedule_grouping: boolean } | null)?.smart_schedule_grouping ?? false;
+
+	// Check for blocked periods
+	const { data: blockedPeriods } = await supabase
+		.from('blocked_periods')
+		.select('start_date, end_date')
+		.eq('therapist_id', therapistId)
+		.lte('start_date', date)
+		.gte('end_date', date);
+
+	if (blockedPeriods && blockedPeriods.length > 0) {
+		return []; // Day is blocked
+	}
+
+	// Get therapist availability for this day (supports multiple blocks)
+	const { data: availabilityBlocks } = await supabase
 		.from('availability')
 		.select('*')
 		.eq('therapist_id', therapistId)
-		.eq('day_of_week', dayOfWeek)
-		.single();
+		.eq('day_of_week', dayOfWeek);
 
-	if (!availability) {
+	if (!availabilityBlocks || availabilityBlocks.length === 0) {
 		return []; // Therapist not available on this day
 	}
-
-	const avail = availability as { start_time: string; end_time: string };
 
 	// Get existing bookings for this date
 	const startOfDay = new Date(date);
@@ -796,44 +814,95 @@ export async function getAvailableSlots(
 		.gte('scheduled_at', startOfDay.toISOString())
 		.lte('scheduled_at', endOfDay.toISOString());
 
-	// Generate available slots
-	const slots: string[] = [];
-	const startTimeParts = avail.start_time.split(':');
-	const endTimeParts = avail.end_time.split(':');
-	const startHour = Number(startTimeParts[0]);
-	const startMin = Number(startTimeParts[1]);
-	const endHour = Number(endTimeParts[0]);
-	const endMin = Number(endTimeParts[1]);
+	const bookingsList = (bookings ?? []) as { scheduled_at: string; scheduled_end_at: string }[];
 
-	const slotStart = new Date(date);
-	slotStart.setHours(startHour, startMin, 0, 0);
-
-	const dayEnd = new Date(date);
-	dayEnd.setHours(endHour, endMin, 0, 0);
-
+	// Generate available slots for each availability block
+	const allSlots: string[] = [];
 	const now = new Date();
 
-	while (slotStart.getTime() + durationMinutes * 60000 <= dayEnd.getTime()) {
-		const slotEnd = new Date(slotStart.getTime() + durationMinutes * 60000);
+	for (const block of availabilityBlocks) {
+		const avail = block as { start_time: string; end_time: string };
+		const startTimeParts = avail.start_time.split(':');
+		const endTimeParts = avail.end_time.split(':');
+		const startHour = Number(startTimeParts[0]);
+		const startMin = Number(startTimeParts[1]);
+		const endHour = Number(endTimeParts[0]);
+		const endMin = Number(endTimeParts[1]);
 
-		// Skip if slot is in the past
-		if (slotStart > now) {
-			// Check for conflicts
-			const hasConflict = bookings?.some(booking => {
-				const b = booking as { scheduled_at: string; scheduled_end_at: string };
-				const bookingStart = new Date(b.scheduled_at);
-				const bookingEnd = new Date(b.scheduled_end_at);
-				return slotStart < bookingEnd && slotEnd > bookingStart;
-			});
+		const blockStart = new Date(date);
+		blockStart.setHours(startHour, startMin, 0, 0);
 
-			if (!hasConflict) {
-				slots.push(slotStart.toISOString());
+		const blockEnd = new Date(date);
+		blockEnd.setHours(endHour, endMin, 0, 0);
+
+		// Check if this block has any bookings
+		const blockHasBookings = smartGrouping && bookingsList.some(booking => {
+			const bookingStart = new Date(booking.scheduled_at);
+			const bookingEnd = new Date(booking.scheduled_end_at);
+			// Booking overlaps with this block's time range
+			return bookingStart < blockEnd && bookingEnd > blockStart;
+		});
+
+		const slotStart = new Date(blockStart);
+
+		while (slotStart.getTime() + durationMinutes * 60000 <= blockEnd.getTime()) {
+			const slotEnd = new Date(slotStart.getTime() + durationMinutes * 60000);
+
+			// Skip if slot is in the past
+			if (slotStart > now) {
+				// Check for conflicts
+				const hasConflict = bookingsList.some(booking => {
+					const bookingStart = new Date(booking.scheduled_at);
+					const bookingEnd = new Date(booking.scheduled_end_at);
+					return slotStart < bookingEnd && slotEnd > bookingStart;
+				});
+
+				if (!hasConflict) {
+					// Apply smart grouping filter if enabled AND this block has bookings
+					if (blockHasBookings) {
+						// Only show slots adjacent to existing bookings in this block
+						const isAdjacent = isAdjacentToBooking(slotStart, slotEnd, bookingsList);
+						if (isAdjacent) {
+							allSlots.push(slotStart.toISOString());
+						}
+					} else {
+						// Block has no bookings OR smart grouping disabled - show all slots
+						allSlots.push(slotStart.toISOString());
+					}
+				}
 			}
-		}
 
-		// Move to next slot (30-minute intervals)
-		slotStart.setMinutes(slotStart.getMinutes() + 30);
+			// Move to next slot (30-minute intervals)
+			slotStart.setMinutes(slotStart.getMinutes() + 30);
+		}
 	}
 
-	return slots;
+	// Sort slots by time
+	return allSlots.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+}
+
+/**
+ * Check if a slot is immediately before or after an existing booking
+ */
+function isAdjacentToBooking(
+	slotStart: Date,
+	slotEnd: Date,
+	bookings: { scheduled_at: string; scheduled_end_at: string }[]
+): boolean {
+	for (const booking of bookings) {
+		const bookingStart = new Date(booking.scheduled_at);
+		const bookingEnd = new Date(booking.scheduled_end_at);
+
+		// Slot ends exactly when booking starts (immediately before)
+		if (slotEnd.getTime() === bookingStart.getTime()) {
+			return true;
+		}
+
+		// Slot starts exactly when booking ends (immediately after)
+		if (slotStart.getTime() === bookingEnd.getTime()) {
+			return true;
+		}
+	}
+
+	return false;
 }

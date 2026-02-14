@@ -4,15 +4,15 @@ import { fail } from '@sveltejs/kit';
 export const load: PageServerLoad = async ({ locals }) => {
 	const { supabase, user } = locals;
 
-	// Get therapist ID
+	// Get therapist ID and settings
 	const { data: therapist } = await supabase
 		.from('therapists')
-		.select('id, is_available')
+		.select('id, is_available, smart_schedule_grouping')
 		.eq('user_id', user!.id)
 		.single();
 
 	if (!therapist) {
-		return { availability: [], isAvailable: false };
+		return { availability: [], isAvailable: false, smartScheduleGrouping: false };
 	}
 
 	// Get availability slots
@@ -24,7 +24,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	return {
 		availability: availability ?? [],
-		isAvailable: therapist.is_available
+		isAvailable: therapist.is_available,
+		smartScheduleGrouping: (therapist as { smart_schedule_grouping: boolean }).smart_schedule_grouping ?? false
 	};
 };
 
@@ -119,6 +120,34 @@ export const actions: Actions = {
 
 		if (error) {
 			return fail(500, { error: 'Error al actualizar disponibilidad' });
+		}
+
+		return { success: true };
+	},
+
+	toggleSmartGrouping: async ({ locals }) => {
+		const { supabase, user } = locals;
+
+		// Get therapist
+		const { data: therapist } = await supabase
+			.from('therapists')
+			.select('id, smart_schedule_grouping')
+			.eq('user_id', user!.id)
+			.single();
+
+		if (!therapist) {
+			return fail(403, { error: 'No autorizado' });
+		}
+
+		const currentValue = (therapist as { smart_schedule_grouping: boolean }).smart_schedule_grouping ?? false;
+
+		const { error } = await supabase
+			.from('therapists')
+			.update({ smart_schedule_grouping: !currentValue } as never)
+			.eq('id', therapist.id);
+
+		if (error) {
+			return fail(500, { error: 'Error al actualizar configuración' });
 		}
 
 		return { success: true };

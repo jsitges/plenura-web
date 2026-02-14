@@ -98,6 +98,8 @@ export interface Database {
 					// Practice association
 					is_independent: boolean;
 					primary_practice_id: string | null;
+					// Scheduling preferences
+					smart_schedule_grouping: boolean;
 					created_at: string;
 					updated_at: string;
 				};
@@ -129,6 +131,7 @@ export interface Database {
 					background_check_passed?: boolean;
 					is_independent?: boolean;
 					primary_practice_id?: string | null;
+					smart_schedule_grouping?: boolean;
 					created_at?: string;
 					updated_at?: string;
 				};
@@ -160,6 +163,7 @@ export interface Database {
 					background_check_passed?: boolean;
 					is_independent?: boolean;
 					primary_practice_id?: string | null;
+					smart_schedule_grouping?: boolean;
 					created_at?: string;
 					updated_at?: string;
 				};

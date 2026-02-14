@@ -41,6 +41,7 @@
 	);
 
 	let isAvailable = $state(data.isAvailable);
+	let smartScheduleGrouping = $state(data.smartScheduleGrouping);
 	let saving = $state(false);
 	let showSuccessMessage = $state(false);
 
@@ -310,6 +311,45 @@
 		</div>
 	</a>
 
+	<!-- Smart Schedule Grouping -->
+	<div class="bg-white rounded-xl border border-gray-100 p-4">
+		<div class="flex items-start justify-between gap-4">
+			<div class="flex items-start gap-3">
+				<div class="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
+					<svg class="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+					</svg>
+				</div>
+				<div>
+					<h3 class="font-medium text-gray-900">Agrupación inteligente de citas</h3>
+					<p class="text-sm text-gray-500 mt-1">
+						En bloques con citas existentes, solo se mostrarán horarios adyacentes para evitar huecos.
+						Los bloques sin citas mostrarán todos los horarios disponibles.
+					</p>
+				</div>
+			</div>
+			<form method="POST" action="?/toggleSmartGrouping" use:enhance={() => {
+				return async ({ update }) => {
+					smartScheduleGrouping = !smartScheduleGrouping;
+					await update();
+				};
+			}}>
+				<button
+					type="submit"
+					class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 {smartScheduleGrouping ? 'bg-primary-600' : 'bg-gray-200'}"
+					role="switch"
+					aria-checked={smartScheduleGrouping}
+				>
+					<span class="sr-only">Activar agrupación inteligente</span>
+					<span
+						aria-hidden="true"
+						class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out {smartScheduleGrouping ? 'translate-x-5' : 'translate-x-0'}"
+					></span>
+				</button>
+			</form>
+		</div>
+	</div>
+
 	<!-- Tips -->
 	<div class="bg-blue-50 border border-blue-200 rounded-xl p-4">
 		<h3 class="font-medium text-blue-800 mb-2">Consejos</h3>
@@ -318,6 +358,7 @@
 			<li>• Puedes agregar múltiples bloques de horario para manejar pausas de comida</li>
 			<li>• Ejemplo: 10:00-13:00 y 17:00-20:00 para tener pausa de comida de 13:00-17:00</li>
 			<li>• Usa "Períodos bloqueados" para bloquear días completos (vacaciones, días festivos, etc.)</li>
+			<li>• La "Agrupación inteligente" agrupa citas en bloques ocupados, mientras bloques vacíos muestran todos los horarios</li>
 		</ul>
 	</div>
 </div>
